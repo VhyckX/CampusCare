@@ -24,3 +24,4 @@ Open `index.html` in a browser. Book an appointment from the Appointment page, c
 
 No backend, database, CDN Bootstrap, framework, or external API is required.
 
+"# CampusCare" 
