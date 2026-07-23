@@ -1,0 +1,126 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Book Appointment | CampusCare</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Roboto:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
+        <div class="container"><a class="navbar-brand brand-mark" href="index.html"><img src="images/campuscare-logo.png" alt="CampusCare logo" class="brand-logo"> CampusCare</a><button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#mainNav" aria-label="Toggle navigation"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="services.html">Services</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="appointment.html">Appointment</a></li>
+                    <li class="nav-item"><a class="nav-link" href="status.html">Status</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <main>
+        <section class="page-hero">
+            <div class="container"><span class="section-kicker">Book a visit</span>
+                <h1>Clinic Appointment</h1>
+                <p>Choose your clinic department and preferred appointment time. After submission, keep your appointment
+                    ID for status checks.</p>
+            </div>
+        </section>
+        <section class="section-padding">
+            <div class="container">
+                <div class="row g-5">
+                    <div class="col-lg-7">
+                        <div class="form-shell">
+                            <form id="appointmentForm" novalidate>
+                                <div id="formAlert" class="mb-4" aria-live="polite"></div>
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label for="fullName" class="form-label">Full
+                                            Name</label><input type="text" class="form-control" id="fullName"
+                                            name="fullName" autocomplete="name" required>
+                                        <div class="invalid-feedback">Please enter your full name.</div>
+                                    </div>
+                                    <div class="col-md-6"><label for="email" class="form-label">Email</label><input
+                                            type="email" class="form-control" id="email" name="email"
+                                            autocomplete="email" required>
+                                        <div class="invalid-feedback">Please enter a valid email address.</div>
+                                    </div>
+                                    <div class="col-md-6"><label for="phone" class="form-label">Phone
+                                            Number</label><input type="tel" class="form-control" id="phone" name="phone"
+                                            autocomplete="tel" required>
+                                        <div class="invalid-feedback">Please enter your phone number.</div>
+                                    </div>
+                                    <div class="col-md-6"><label for="department" class="form-label">Clinic
+                                            Department</label><select class="form-select" id="department"
+                                            name="department" required>
+                                            <option value="">Select department</option>
+                                            <option>General Consultation</option>
+                                            <option>Dental Care</option>
+                                            <option>Eye Care</option>
+                                            <option>Emergency Support</option>
+                                        </select>
+                                        <div class="invalid-feedback">Please select a clinic department.</div>
+                                    </div>
+                                    <div class="col-md-6"><label for="appointmentDate" class="form-label">Appointment
+                                            Date</label><input type="date" class="form-control" id="appointmentDate"
+                                            name="appointmentDate" required>
+                                        <div class="invalid-feedback">Please choose an appointment date.</div>
+                                    </div>
+                                    <div class="col-md-6"><label for="appointmentTime" class="form-label">Appointment
+                                            Time</label><input type="time" class="form-control" id="appointmentTime"
+                                            name="appointmentTime" required>
+                                        <div class="invalid-feedback">Please choose an appointment time.</div>
+                                    </div>
+                                    <div class="col-12"><label for="reason" class="form-label">Reason for
+                                            Visit</label><textarea class="form-control" id="reason" name="reason"
+                                            rows="5" required></textarea>
+                                        <div class="invalid-feedback">Please describe your reason for visiting.</div>
+                                    </div>
+                                    <div class="col-12"><button type="submit"
+                                            class="btn btn-primary btn-lg w-100">Submit Appointment</button></div>
+                                </div>
+                            </form>
+                            <div id="appointmentSlipArea" class="appointment-slip-area mt-4" aria-live="polite"></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <aside class="info-panel h-100"><span class="section-kicker">Before you submit</span>
+                            <h2>Keep your appointment ID safe.</h2>
+                            <p>Your generated appointment ID will be needed on the status page. This project stores
+                                appointment details in your browser using localStorage.</p>
+                            <div class="tip-list">
+                                <div><strong>Use correct details</strong><span>Clinic staff can identify your request
+                                        faster.</span></div>
+                                <div><strong>Pick a realistic time</strong><span>Choose a time you can attend
+                                        comfortably.</span></div>
+                                <div><strong>Explain briefly</strong><span>A clear reason helps the clinic
+                                        prepare.</span></div>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="site-footer">
+        <div class="container d-flex flex-column flex-md-row justify-content-between gap-3">
+            <p class="mb-0">&copy; 2026 CampusCare.</p><a href="status.html">Check appointment status</a>
+        </div>
+    </footer>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/script.js"></script>
+</body>
+
+</html>
+
+
