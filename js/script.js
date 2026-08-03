@@ -146,7 +146,7 @@ function setupAppointmentForm() {
 
     form.reset();
     form.classList.remove("was-validated");
-    alertBox.innerHTML = "";
+    showAlert(alertBox, "success", "<strong>✓ Appointment booked successfully!</strong><br>Your Appointment ID: <strong>" + appointmentId + "</strong><br>Please save this ID. You will need it to check your appointment status later.");
 
     if (slipArea) {
       slipArea.innerHTML = renderAppointmentSlip(appointment);
@@ -195,11 +195,48 @@ function setupStatusSearch() {
   });
 }
 
+
+function applySavedTheme() {
+  const savedTheme = localStorage.getItem("campusCareTheme");
+  const useDarkMode = savedTheme === "dark";
+  document.body.classList.toggle("dark-mode", useDarkMode);
+  updateThemeToggle(useDarkMode);
+}
+
+function updateThemeToggle(useDarkMode) {
+  const themeToggle = document.getElementById("themeToggle");
+  if (!themeToggle) return;
+
+  const themeIcon = themeToggle.querySelector(".theme-icon");
+  themeToggle.setAttribute("aria-label", useDarkMode ? "Switch to light mode" : "Switch to dark mode");
+  themeToggle.setAttribute("title", useDarkMode ? "Switch to light mode" : "Switch to dark mode");
+
+  if (themeIcon) {
+    themeIcon.textContent = useDarkMode ? "☀" : "🌙";
+  }
+}
+
+function setupThemeToggle() {
+  const themeToggle = document.getElementById("themeToggle");
+  if (!themeToggle) return;
+
+  themeToggle.addEventListener("click", function () {
+    const useDarkMode = !document.body.classList.contains("dark-mode");
+    document.body.classList.toggle("dark-mode", useDarkMode);
+    localStorage.setItem("campusCareTheme", useDarkMode ? "dark" : "light");
+    updateThemeToggle(useDarkMode);
+  });
+}
 document.addEventListener("DOMContentLoaded", function () {
+  applySavedTheme();
+  setupThemeToggle();
   setMinimumAppointmentDate();
   setupAppointmentForm();
   setupStatusSearch();
 });
+
+
+
 
 
 

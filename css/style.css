@@ -758,3 +758,129 @@ a:hover {
     }
 }
 
+
+body.dark-mode {
+    --primary: #4ea1ff;
+    --primary-dark: #8cc4ff;
+    --teal: #2dd4bf;
+    --bg: #0f172a;
+    --text: #e5edf7;
+    --muted: #a8b3c7;
+    --border: #263449;
+    --white: #162033;
+    --shadow: 0 20px 45px rgba(0, 0, 0, .28)
+}
+
+.theme-toggle {
+    align-items: center;
+    background: rgba(0, 87, 184, .1);
+    border: 1px solid rgba(0, 87, 184, .18);
+    border-radius: 999px;
+    color: var(--text);
+    display: inline-flex;
+    font-size: 1rem;
+    height: 40px;
+    justify-content: center;
+    line-height: 1;
+    transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+    width: 40px
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus {
+    background: rgba(0, 169, 157, .16);
+    border-color: rgba(0, 169, 157, .35);
+    transform: translateY(-2px)
+}
+
+body.dark-mode .navbar,
+body.dark-mode .bg-white,
+body.dark-mode .site-footer {
+    background-color: var(--white) !important
+}
+
+body.dark-mode .navbar {
+    border-bottom: 1px solid var(--border)
+}
+
+body.dark-mode .navbar-toggler {
+    border-color: var(--border)
+}
+
+body.dark-mode .navbar-toggler-icon {
+    filter: invert(1) grayscale(1) brightness(1.8)
+}
+
+body.dark-mode .hero-section {
+    background: radial-gradient(circle at top left, rgba(45, 212, 191, .14), transparent 32%), var(--bg)
+}
+
+body.dark-mode .page-hero {
+    background: linear-gradient(135deg, rgba(78, 161, 255, .12), rgba(45, 212, 191, .12))
+}
+
+body.dark-mode .contact-band {
+    background: linear-gradient(135deg, #004da3, #008f86)
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select,
+body.dark-mode textarea.form-control {
+    background-color: #101827;
+    border-color: var(--border);
+    color: var(--text)
+}
+
+body.dark-mode .form-control::placeholder {
+    color: var(--muted)
+}
+
+body.dark-mode .form-control:focus,
+body.dark-mode .form-select:focus {
+    background-color: #101827;
+    color: var(--text)
+}
+
+body.dark-mode .tip-list div,
+body.dark-mode .empty-state,
+body.dark-mode .appointment-summary,
+body.dark-mode .slip-code {
+    background: #101827
+}
+
+body.dark-mode .care-grid span,
+body.dark-mode .home-service-icon {
+    background: rgba(78, 161, 255, .12)
+}
+
+body.dark-mode .badge-status,
+body.dark-mode .hours {
+    background: rgba(45, 212, 191, .16);
+    color: #5eead4
+}
+
+body.dark-mode .alert-success {
+    background-color: rgba(45, 212, 191, .14);
+    border-color: rgba(45, 212, 191, .35);
+    color: #d8fff8
+}
+
+body.dark-mode .alert-warning {
+    background-color: rgba(250, 204, 21, .14);
+    border-color: rgba(250, 204, 21, .35);
+    color: #fef3c7
+}
+
+body.dark-mode .btn-close {
+    filter: invert(1) grayscale(1) brightness(1.7)
+}
+
+body.dark-mode .site-footer {
+    color: var(--muted)
+}
+
+@media (max-width: 991.98px) {
+    .theme-toggle {
+        margin-top: .5rem
+    }
+}
