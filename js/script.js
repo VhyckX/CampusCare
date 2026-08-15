@@ -228,7 +228,7 @@ function ensureAuthGate() {
     '<span class="section-kicker">Welcome back</span><h2 id="authModalTitle">Login to CampusCare</h2>' +
     '<form id="loginForm" novalidate>' +
     '<div class="mb-3"><label for="loginEmail" class="form-label">Email</label><input type="email" class="form-control" id="loginEmail" autocomplete="email" required><div class="invalid-feedback">Please enter your email.</div></div>' +
-    '<div class="mb-4"><label for="loginPassword" class="form-label">Password</label><input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required><div class="invalid-feedback">Please enter your password.</div></div>' +
+    '<div class="mb-4"><label for="loginPassword" class="form-label">Password</label><div class="password-field"><input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required><button class="password-toggle" type="button" data-password-toggle data-password-target="loginPassword" aria-label="Show password"><span aria-hidden="true">&#128065;</span></button></div><div class="invalid-feedback">Please enter your password.</div></div>' +
     '<button type="submit" class="btn btn-primary btn-lg w-100">Login</button>' +
     '</form>' +
     '<p class="auth-switch mb-0">New to CampusCare? <button type="button" data-auth-panel="registerPanel">Create an account</button></p>' +
@@ -238,8 +238,8 @@ function ensureAuthGate() {
     '<form id="registerForm" novalidate>' +
     '<div class="mb-3"><label for="registerName" class="form-label">Full Name</label><input type="text" class="form-control" id="registerName" autocomplete="name" required><div class="invalid-feedback">Please enter your full name.</div></div>' +
     '<div class="mb-3"><label for="registerEmail" class="form-label">Email</label><input type="email" class="form-control" id="registerEmail" autocomplete="email" required><div class="invalid-feedback">Please enter a valid email.</div></div>' +
-    '<div class="mb-3"><label for="registerPassword" class="form-label">Password</label><input type="password" class="form-control" id="registerPassword" autocomplete="new-password" minlength="6" required><div class="invalid-feedback">Password must be at least 6 characters.</div></div>' +
-    '<div class="mb-4"><label for="confirmPassword" class="form-label">Confirm Password</label><input type="password" class="form-control" id="confirmPassword" autocomplete="new-password" minlength="6" required><div class="invalid-feedback">Please confirm your password.</div></div>' +
+    '<div class="mb-3"><label for="registerPassword" class="form-label">Password</label><div class="password-field"><input type="password" class="form-control" id="registerPassword" autocomplete="new-password" minlength="6" required><button class="password-toggle" type="button" data-password-toggle data-password-target="registerPassword" aria-label="Show password"><span aria-hidden="true">&#128065;</span></button></div><div class="invalid-feedback">Password must be at least 6 characters.</div></div>' +
+    '<div class="mb-4"><label for="confirmPassword" class="form-label">Confirm Password</label><div class="password-field"><input type="password" class="form-control" id="confirmPassword" autocomplete="new-password" minlength="6" required><button class="password-toggle" type="button" data-password-toggle data-password-target="confirmPassword" aria-label="Show password"><span aria-hidden="true">&#128065;</span></button></div><div class="invalid-feedback">Please confirm your password.</div></div>' +
     '<button type="submit" class="btn btn-primary btn-lg w-100">Register</button>' +
     '</form>' +
     '<p class="auth-switch mb-0">Already registered? <button type="button" data-auth-panel="loginPanel">Login instead</button></p>' +
@@ -277,6 +277,7 @@ function showAuthGate() {
 
   setupRegisterForm();
   setupLoginForm();
+  setupPasswordToggles(authGate);
   authGate.classList.add("active");
   document.body.classList.add("auth-locked");
 }
@@ -367,6 +368,24 @@ function setupLoginForm() {
       hideAuthGate();
       renderAuthNav();
     }, 800);
+  });
+}
+
+function setupPasswordToggles(container) {
+  const scope = container || document;
+  scope.querySelectorAll("[data-password-toggle]").forEach(function (button) {
+    if (button.dataset.toggleReady === "true") return;
+    button.dataset.toggleReady = "true";
+
+    button.addEventListener("click", function () {
+      const input = document.getElementById(button.getAttribute("data-password-target"));
+      if (!input) return;
+
+      const showPassword = input.type === "password";
+      input.type = showPassword ? "text" : "password";
+      button.setAttribute("aria-label", showPassword ? "Hide password" : "Show password");
+      button.querySelector("span").innerHTML = showPassword ? "&#128065;&#8725;" : "&#128065;";
+    });
   });
 }
 
@@ -929,6 +948,7 @@ document.addEventListener("DOMContentLoaded", function () {
   renderAuthNav();
   setupRegisterForm();
   setupLoginForm();
+  setupPasswordToggles();
   setMinimumAppointmentDate();
   setupDoctorSelection();
   applyAppointmentPrefill();

@@ -57,14 +57,23 @@
                                         required>
                                     <div class="invalid-feedback">Please enter a valid email.</div>
                                 </div>
-                                <div class="mb-3"><label for="registerPassword" class="form-label">Password</label><input
-                                        type="password" class="form-control" id="registerPassword"
-                                        autocomplete="new-password" minlength="6" required>
+                                <div class="mb-3"><label for="registerPassword" class="form-label">Password</label>
+                                    <div class="password-field"><input type="password" class="form-control"
+                                            id="registerPassword" autocomplete="new-password" minlength="6"
+                                            required><button class="password-toggle" type="button"
+                                            data-password-toggle data-password-target="registerPassword"
+                                            aria-label="Show password"><span aria-hidden="true">&#128065;</span></button>
+                                    </div>
                                     <div class="invalid-feedback">Password must be at least 6 characters.</div>
                                 </div>
                                 <div class="mb-4"><label for="confirmPassword" class="form-label">Confirm
-                                        Password</label><input type="password" class="form-control" id="confirmPassword"
-                                        autocomplete="new-password" minlength="6" required>
+                                        Password</label>
+                                    <div class="password-field"><input type="password" class="form-control"
+                                            id="confirmPassword" autocomplete="new-password" minlength="6"
+                                            required><button class="password-toggle" type="button"
+                                            data-password-toggle data-password-target="confirmPassword"
+                                            aria-label="Show password"><span aria-hidden="true">&#128065;</span></button>
+                                    </div>
                                     <div class="invalid-feedback">Please confirm your password.</div>
                                 </div>
                                 <button type="submit" class="btn btn-primary btn-lg w-100">Register</button>

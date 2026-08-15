@@ -569,6 +569,39 @@ a:hover {
     box-shadow: 0 0 0 .25rem rgba(0, 169, 157, .16)
 }
 
+.password-field {
+    position: relative
+}
+
+.password-field .form-control {
+    padding-right: 3.25rem
+}
+
+.password-toggle {
+    align-items: center;
+    background: rgba(0, 87, 184, .08);
+    border: 1px solid rgba(0, 87, 184, .14);
+    border-radius: 50%;
+    color: var(--primary);
+    display: inline-flex;
+    height: 36px;
+    justify-content: center;
+    line-height: 1;
+    position: absolute;
+    right: .55rem;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+    width: 36px
+}
+
+.password-toggle:hover,
+.password-toggle:focus {
+    background: rgba(0, 169, 157, .14);
+    border-color: rgba(0, 169, 157, .32);
+    color: var(--teal)
+}
+
 .tip-list {
     display: grid;
     gap: 1rem;
@@ -1054,6 +1087,12 @@ body.dark-mode .form-control:focus,
 body.dark-mode .form-select:focus {
     background-color: #101827;
     color: var(--text)
+}
+
+body.dark-mode .password-toggle {
+    background: rgba(78, 161, 255, .12);
+    border-color: var(--border);
+    color: var(--primary)
 }
 
 body.dark-mode .tip-list div,
