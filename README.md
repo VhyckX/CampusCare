@@ -6,9 +6,8 @@ CampusCare is a student clinic appointment frontend project built for a SIWES pr
 
 - `index.html` - Home page with hero section, statistics, service preview, how it works, and contact section.
 - `services.html` - Clinic service cards with descriptions and opening hours.
-- `appointment.html` - Appointment booking form with validation and generated appointment ID.
-- `status.html` - Appointment status lookup using the generated appointment ID.
-- `retrieve.html` - Appointment slip retrieval page for saved appointment details.
+- `appointment.html` - Appointment booking form with validation, doctor selection, local history, generated appointment ID, and appointment slip download.
+- `status.html` - Appointment status tracking using the generated appointment ID.
 
 ## Technologies Used
 
@@ -23,5 +22,3 @@ CampusCare is a student clinic appointment frontend project built for a SIWES pr
 Open `index.html` in a browser. Book an appointment from the Appointment page, copy the generated appointment ID, then use it on the Status page to view the saved appointment details.
 
 No backend, database, CDN Bootstrap, framework, or external API is required.
-
-"# CampusCare" 

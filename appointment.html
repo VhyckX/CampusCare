@@ -21,12 +21,15 @@
                 class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
                 aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="services.html">Services</a></li>
                     <li class="nav-item"><a class="nav-link active" href="appointment.html">Appointment</a></li>
                     <li class="nav-item"><a class="nav-link" href="status.html">Status</a></li>
-                                    <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch to dark mode" title="Switch theme"><span class="theme-icon">🌙</span></button></li>
+                    <li class="nav-item auth-nav" id="authNav"></li>
+                    <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle"
+                            aria-label="Switch to dark mode" title="Switch theme"><span
+                                class="theme-icon">&#127769;</span></button></li>
                 </ul>
             </div>
         </div>
@@ -73,6 +76,15 @@
                                         </select>
                                         <div class="invalid-feedback">Please select a clinic department.</div>
                                     </div>
+                                    <div class="col-md-6"><label for="doctor" class="form-label">Preferred
+                                            Doctor</label><select class="form-select" id="doctor" name="doctor"
+                                            required>
+                                            <option value="">Select a service first</option>
+                                        </select>
+                                        <div class="invalid-feedback">Please select a doctor for this service.</div>
+                                        <div class="form-text doctor-helper" id="doctorHelper">Doctors are matched to
+                                            the selected clinic department.</div>
+                                    </div>
                                     <div class="col-md-6"><label for="appointmentDate" class="form-label">Appointment
                                             Date</label><input type="date" class="form-control" id="appointmentDate"
                                             name="appointmentDate" required>
@@ -113,10 +125,49 @@
                 </div>
             </div>
         </section>
+        <section class="section-padding bg-soft appointment-history-section">
+            <div class="container">
+                <div class="section-heading"><span class="section-kicker">Appointment history</span>
+                    <h2>Your saved clinic visits.</h2>
+                    <p class="lead mb-0">Appointments saved on this browser appear here. You can copy an ID, download a
+                        slip again, or safely cancel a pending appointment.</p>
+                </div>
+                <div class="history-filters" aria-label="Filter appointments">
+                    <button class="history-filter active" type="button" data-history-filter="all">All</button>
+                    <button class="history-filter" type="button" data-history-filter="upcoming">Upcoming</button>
+                    <button class="history-filter" type="button" data-history-filter="pending">Pending/Awaiting</button>
+                    <button class="history-filter" type="button" data-history-filter="active">Active</button>
+                    <button class="history-filter" type="button" data-history-filter="completed">Completed</button>
+                    <button class="history-filter" type="button" data-history-filter="cancelled">Cancelled</button>
+                </div>
+                <div id="appointmentHistory" class="appointment-history" aria-live="polite"></div>
+            </div>
+        </section>
+
     </main>
     <footer class="site-footer">
-        <div class="container d-flex flex-column flex-md-row justify-content-between gap-3">
-            <p class="mb-0"> CampusCare.</p><a href="status.html"> Check appointment status</a>
+        <div class="container footer-content">
+            <div>
+                <p class="mb-1">CampusCare.</p>
+                <a href="status.html">Check appointment status</a>
+            </div>
+            <div class="footer-contact">
+                <span>Contact Info</span>
+                <div class="contact-links">
+                    <a class="social-link" href="https://wa.me/2349069920167"
+                        aria-label="CampusCare WhatsApp"><span>WA</span></a>
+                    <a class="social-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=victorkingak03@gmail.com"
+                        target="_blank" rel="noopener noreferrer" aria-label="CampusCare Email">
+                        <span>Email</span>
+                    </a>
+                    <a class="social-link" href="https://www.facebook.com/profile.php?id=61579020625371"
+                        aria-label="CampusCare Facebook"><span>f</span></a>
+                    <a class="social-link" href="https://www.instagram.com/vhyck.wrldx?igsh=MTNyeTVvcjVuY2cxbg=="
+                        aria-label="CampusCare Instagram"><span>IG</span></a>
+                    <a class="social-link" href="https://x.com/VhYcK_WrLdX"
+                        aria-label="CampusCare Twitter"><span>X</span></a>
+                </div>
+            </div>
         </div>
     </footer>
     <script src="js/bootstrap.min.js"></script>

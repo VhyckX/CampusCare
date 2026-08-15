@@ -16,16 +16,20 @@
 
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
-        <div class="container"><a class="navbar-brand brand-mark" href="index.html"><img src="images/campuscare-logo.png" alt="CampusCare logo" class="brand-logo"> CampusCare</a><button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#mainNav" aria-label="Toggle navigation"><span
-                    class="navbar-toggler-icon"></span></button>
+        <div class="container"><a class="navbar-brand brand-mark" href="index.html"><img
+                    src="images/campuscare-logo.png" alt="CampusCare logo" class="brand-logo"> CampusCare</a><button
+                class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
                     <li class="nav-item"><a class="nav-link active" href="services.html">Services</a></li>
                     <li class="nav-item"><a class="nav-link" href="appointment.html">Appointment</a></li>
                     <li class="nav-item"><a class="nav-link" href="status.html">Status</a></li>
-                                    <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch to dark mode" title="Switch theme"><span class="theme-icon">🌙</span></button></li>
+                    <li class="nav-item auth-nav" id="authNav"></li>
+                    <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle"
+                            aria-label="Switch to dark mode" title="Switch theme"><span
+                                class="theme-icon">&#127769;</span></button></li>
                 </ul>
             </div>
         </div>
@@ -42,8 +46,10 @@
                 <div class="row g-4">
                     <div class="col-md-6">
                         <article class="service-detail-card h-100">
-                            <img src="images/general-consultation.jpg" alt="General consultation service" class="service-detail-img">
-                            <div class="service-icon">+</div>
+                            <img src="images/general-consultation.jpg" alt="General consultation service"
+                                class="service-detail-img">
+                            <div class="service-icon"><img src="images/general-icon.png"
+                                    alt="General consultation icon"></div>
                             <h2>General Consultation</h2>
                             <p>For common health complaints, basic medical checks, fever, headaches, stomach discomfort,
                                 and general wellness guidance.</p><span class="hours">Opening Hours: Mon - Fri, 8:00 AM
@@ -52,8 +58,9 @@
                     </div>
                     <div class="col-md-6">
                         <article class="service-detail-card h-100">
-                            <img src="images/dental-consultation.jpg" alt="Dental care service" class="service-detail-img">
-                            <div class="service-icon">D</div>
+                            <img src="images/dental-consultation.jpg" alt="Dental care service"
+                                class="service-detail-img">
+                            <div class="service-icon"><img src="images/dental-icon.png" alt="Dental care icon"></div>
                             <h2>Dental Care</h2>
                             <p>For tooth pain, gum complaints, dental hygiene advice, and student dental checkup
                                 requests.</p><span class="hours">Opening Hours: Tue - Thu, 9:00 AM - 2:00 PM</span>
@@ -62,7 +69,7 @@
                     <div class="col-md-6">
                         <article class="service-detail-card h-100">
                             <img src="images/eye-care.jpg" alt="Eye care service" class="service-detail-img">
-                            <div class="service-icon">E</div>
+                            <div class="service-icon"><img src="images/eye-icon.png" alt="Eye care icon"></div>
                             <h2>Eye Care</h2>
                             <p>For eye strain, irritation, vision screening requests, and guidance on when further eye
                                 care is needed.</p><span class="hours">Opening Hours: Mon - Wed, 10:00 AM - 3:00
@@ -71,8 +78,10 @@
                     </div>
                     <div class="col-md-6">
                         <article class="service-detail-card h-100">
-                            <img src="images/emergency-support.jpg" alt="Emergency support service" class="service-detail-img">
-                            <div class="service-icon">!</div>
+                            <img src="images/emergency-support.jpg" alt="Emergency support service"
+                                class="service-detail-img">
+                            <div class="service-icon"><img src="images/emergency-icon.png" alt="Emergency support icon">
+                            </div>
                             <h2>Emergency Support</h2>
                             <p>For urgent clinic attention, sudden illness, minor injuries, and situations that need
                                 quick student support.</p><span class="hours">Opening Hours: Daily, 24/7 Support</span>
@@ -81,10 +90,49 @@
                 </div>
             </div>
         </section>
+        <section class="section-padding bg-soft doctors-section">
+            <div class="container">
+                <div class="section-heading"><span class="section-kicker">Our Doctors</span>
+                    <h2>Meet the clinic team.</h2>
+                    <p class="lead mb-0">Choose a doctor from the available clinic departments and continue with the existing appointment form.</p>
+                </div>
+                <div class="doctor-tools">
+                    <label class="visually-hidden" for="doctorSearch">Search doctors</label>
+                    <input type="search" class="form-control" id="doctorSearch" placeholder="Search by doctor, specialty, or service">
+                    <label class="visually-hidden" for="doctorAvailabilityFilter">Filter availability</label>
+                    <select class="form-select" id="doctorAvailabilityFilter">
+                        <option value="all">All</option>
+                        <option value="available">Available</option>
+                        <option value="unavailable">Unavailable</option>
+                    </select>
+                </div>
+                <div id="doctorsGrid" class="doctors-grid" aria-live="polite"></div>
+            </div>
+        </section>
     </main>
     <footer class="site-footer">
-        <div class="container d-flex flex-column flex-md-row justify-content-between gap-3">
-            <p class="mb-0"> CampusCare.</p><a href="appointment.html">Book appointment</a>
+        <div class="container footer-content">
+            <div>
+                <p class="mb-1">CampusCare.</p>
+                <a href="appointment.html">Book appointment</a>
+            </div>
+            <div class="footer-contact">
+                <span>Contact Info</span>
+                <div class="contact-links">
+                    <a class="social-link" href="https://wa.me/2349069920167"
+                        aria-label="CampusCare WhatsApp"><span>WA</span></a>
+                    <a class="social-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=victorkingak03@gmail.com"
+                        target="_blank" rel="noopener noreferrer" aria-label="CampusCare Email">
+                        <span>Email</span>
+                    </a>
+                    <a class="social-link" href="https://www.facebook.com/profile.php?id=61579020625371"
+                        aria-label="CampusCare Facebook"><span>f</span></a>
+                    <a class="social-link" href="https://www.instagram.com/vhyck.wrldx?igsh=MTNyeTVvcjVuY2cxbg=="
+                        aria-label="CampusCare Instagram"><span>IG</span></a>
+                    <a class="social-link" href="https://x.com/VhYcK_WrLdX"
+                        aria-label="CampusCare Twitter"><span>X</span></a>
+                </div>
+            </div>
         </div>
     </footer>
     <script src="js/bootstrap.min.js"></script>
@@ -92,5 +140,3 @@
 </body>
 
 </html>
-
-

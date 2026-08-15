@@ -16,16 +16,20 @@
 
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
-        <div class="container"><a class="navbar-brand brand-mark" href="index.html"><img src="images/campuscare-logo.png" alt="CampusCare logo" class="brand-logo"> CampusCare</a><button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#mainNav" aria-label="Toggle navigation"><span
-                    class="navbar-toggler-icon"></span></button>
+        <div class="container"><a class="navbar-brand brand-mark" href="index.html"><img
+                    src="images/campuscare-logo.png" alt="CampusCare logo" class="brand-logo"> CampusCare</a><button
+                class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="services.html">Services</a></li>
                     <li class="nav-item"><a class="nav-link" href="appointment.html">Appointment</a></li>
                     <li class="nav-item"><a class="nav-link active" href="status.html">Status</a></li>
-                                    <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch to dark mode" title="Switch theme"><span class="theme-icon">🌙</span></button></li>
+                    <li class="nav-item auth-nav" id="authNav"></li>
+                    <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle"
+                            aria-label="Switch to dark mode" title="Switch theme"><span
+                                class="theme-icon">&#127769;</span></button></li>
                 </ul>
             </div>
         </div>
@@ -34,7 +38,7 @@
         <section class="page-hero">
             <div class="container"><span class="section-kicker">Track your visit</span>
                 <h1>Appointment Status</h1>
-                <p>Enter your appointment ID to view the saved clinic appointment details on this browser.</p>
+                <p>Track a saved appointment using the appointment ID generated on this browser.</p>
             </div>
         </section>
         <section class="section-padding">
@@ -52,8 +56,9 @@
                             </form>
                             <div id="statusResult" class="status-result mt-4" aria-live="polite">
                                 <div class="empty-state">
-                                    <h2>Ready when you are.</h2>
-                                    <p>Search with the appointment ID you received after booking.</p>
+                                    <h2>Track an appointment.</h2>
+                                    <p>Enter an appointment ID to see the clinic tracking details, current status,
+                                        patient information, service, doctor, date, and time.</p>
                                 </div>
                             </div>
                         </div>
@@ -63,8 +68,28 @@
         </section>
     </main>
     <footer class="site-footer">
-        <div class="container d-flex flex-column flex-md-row justify-content-between gap-3">
-            <p class="mb-0"> CampusCare.</p><a href="appointment.html">Book a new appointment</a>
+        <div class="container footer-content">
+            <div>
+                <p class="mb-1">CampusCare.</p>
+                <a href="appointment.html">Book a new appointment</a>
+            </div>
+            <div class="footer-contact">
+                <span>Contact Info</span>
+                <div class="contact-links">
+                    <a class="social-link" href="https://wa.me/2349069920167"
+                        aria-label="CampusCare WhatsApp"><span>WA</span></a>
+                    <a class="social-link" href="https://mail.google.com/mail/?view=cm&fs=1&to=victorkingak03@gmail.com"
+                        target="_blank" rel="noopener noreferrer" aria-label="CampusCare Email">
+                        <span>Email</span>
+                    </a>
+                    <a class="social-link" href="https://www.facebook.com/profile.php?id=61579020625371"
+                        aria-label="CampusCare Facebook"><span>f</span></a>
+                    <a class="social-link" href="https://www.instagram.com/vhyck.wrldx?igsh=MTNyeTVvcjVuY2cxbg=="
+                        aria-label="CampusCare Instagram"><span>IG</span></a>
+                    <a class="social-link" href="https://x.com/VhYcK_WrLdX"
+                        aria-label="CampusCare Twitter"><span>X</span></a>
+                </div>
+            </div>
         </div>
     </footer>
     <script src="js/bootstrap.min.js"></script>
@@ -72,5 +97,3 @@
 </body>
 
 </html>
-
-
