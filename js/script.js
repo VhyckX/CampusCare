@@ -1,7 +1,5 @@
 const STORAGE_KEY = "campusCareAppointments";
 const THEME_KEY = "campusCareTheme";
-const USERS_KEY = "campusCareUsers";
-const CURRENT_USER_KEY = "campusCareCurrentUser";
 let latestAppointmentSlip = null;
 let currentHistoryFilter = "all";
 
@@ -113,33 +111,6 @@ function saveAppointments(appointments) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(appointments.map(normalizeAppointment)));
 }
 
-function getUsers() {
-  return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function getCurrentUser() {
-  return JSON.parse(localStorage.getItem(CURRENT_USER_KEY)) || null;
-}
-
-function setCurrentUser(user) {
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({
-    fullName: user.fullName,
-    email: user.email
-  }));
-}
-
-function clearCurrentUser() {
-  localStorage.removeItem(CURRENT_USER_KEY);
-}
-
-function getFirstName(fullName) {
-  return String(fullName || "Student").trim().split(/\s+/)[0] || "Student";
-}
-
 function generateAppointmentId() {
   const today = new Date();
   const datePart = today.toISOString().slice(0, 10).replaceAll("-", "");
@@ -170,15 +141,14 @@ function getAppointmentDateTime(appointment) {
   return new Date(appointment.appointmentDate + "T" + appointment.appointmentTime);
 }
 
+function hasScheduledTimePassed(appointment) {
+  const appointmentDateTime = getAppointmentDateTime(appointment);
+  return !Number.isNaN(appointmentDateTime.getTime()) && appointmentDateTime < new Date();
+}
+
 function getDisplayStatus(appointment) {
   if (appointment.status === "Cancelled") return "Cancelled";
   if (appointment.status === "Completed") return "Completed";
-
-  const appointmentDateTime = getAppointmentDateTime(appointment);
-  if (!Number.isNaN(appointmentDateTime.getTime()) && appointmentDateTime < new Date()) {
-    return "Completed";
-  }
-
   return appointment.status || "Pending";
 }
 
@@ -190,209 +160,14 @@ function showAlert(target, type, message) {
   target.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
 }
 
-function renderAuthNav() {
-  const authNav = document.getElementById("authNav");
-  if (!authNav) return;
-
-  const currentUser = getCurrentUser();
-  if (currentUser) {
-    hideAuthGate();
-    authNav.innerHTML = '<span class="nav-welcome">Hi, ' + escapeHtml(getFirstName(currentUser.fullName)) + '</span><button class="nav-link logout-link" type="button" id="logoutBtn">Logout</button>';
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", function () {
-        clearCurrentUser();
-        renderAuthNav();
-      });
-    }
-    return;
-  }
-
-  authNav.innerHTML = "";
-  showAuthGate();
-}
-
-function ensureAuthGate() {
-  if (document.getElementById("authGate") || document.body.classList.contains("auth-page")) return;
-
-  document.body.insertAdjacentHTML("beforeend",
-    '<div class="auth-gate" id="authGate" aria-live="polite">' +
-    '<div class="auth-backdrop"></div>' +
-    '<div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">' +
-    '<div class="auth-tabs" role="tablist">' +
-    '<button class="auth-tab active" type="button" data-auth-panel="loginPanel">Login</button>' +
-    '<button class="auth-tab" type="button" data-auth-panel="registerPanel">Register</button>' +
-    '</div>' +
-    '<div id="authAlert" class="mb-4" aria-live="polite"></div>' +
-    '<section class="auth-panel active" id="loginPanel">' +
-    '<span class="section-kicker">Welcome back</span><h2 id="authModalTitle">Login to CampusCare</h2>' +
-    '<form id="loginForm" novalidate>' +
-    '<div class="mb-3"><label for="loginEmail" class="form-label">Email</label><input type="email" class="form-control" id="loginEmail" autocomplete="email" required><div class="invalid-feedback">Please enter your email.</div></div>' +
-    '<div class="mb-4"><label for="loginPassword" class="form-label">Password</label><div class="password-field"><input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required><button class="password-toggle" type="button" data-password-toggle data-password-target="loginPassword" aria-label="Show password"><span aria-hidden="true">&#128065;</span></button></div><div class="invalid-feedback">Please enter your password.</div></div>' +
-    '<button type="submit" class="btn btn-primary btn-lg w-100">Login</button>' +
-    '</form>' +
-    '<p class="auth-switch mb-0">New to CampusCare? <button type="button" data-auth-panel="registerPanel">Create an account</button></p>' +
-    '</section>' +
-    '<section class="auth-panel" id="registerPanel">' +
-    '<span class="section-kicker">Create account</span><h2>Register</h2>' +
-    '<form id="registerForm" novalidate>' +
-    '<div class="mb-3"><label for="registerName" class="form-label">Full Name</label><input type="text" class="form-control" id="registerName" autocomplete="name" required><div class="invalid-feedback">Please enter your full name.</div></div>' +
-    '<div class="mb-3"><label for="registerEmail" class="form-label">Email</label><input type="email" class="form-control" id="registerEmail" autocomplete="email" required><div class="invalid-feedback">Please enter a valid email.</div></div>' +
-    '<div class="mb-3"><label for="registerPassword" class="form-label">Password</label><div class="password-field"><input type="password" class="form-control" id="registerPassword" autocomplete="new-password" minlength="6" required><button class="password-toggle" type="button" data-password-toggle data-password-target="registerPassword" aria-label="Show password"><span aria-hidden="true">&#128065;</span></button></div><div class="invalid-feedback">Password must be at least 6 characters.</div></div>' +
-    '<div class="mb-4"><label for="confirmPassword" class="form-label">Confirm Password</label><div class="password-field"><input type="password" class="form-control" id="confirmPassword" autocomplete="new-password" minlength="6" required><button class="password-toggle" type="button" data-password-toggle data-password-target="confirmPassword" aria-label="Show password"><span aria-hidden="true">&#128065;</span></button></div><div class="invalid-feedback">Please confirm your password.</div></div>' +
-    '<button type="submit" class="btn btn-primary btn-lg w-100">Register</button>' +
-    '</form>' +
-    '<p class="auth-switch mb-0">Already registered? <button type="button" data-auth-panel="loginPanel">Login instead</button></p>' +
-    '</section>' +
-    '</div>' +
-    '</div>');
-
-  setupAuthPanelSwitching();
-}
-
-function switchAuthPanel(panelId) {
-  document.querySelectorAll(".auth-panel").forEach(function (panel) {
-    panel.classList.toggle("active", panel.id === panelId);
-  });
-  document.querySelectorAll("[data-auth-panel]").forEach(function (button) {
-    button.classList.toggle("active", button.getAttribute("data-auth-panel") === panelId);
-  });
-
-  const authAlert = document.getElementById("authAlert");
-  if (authAlert) authAlert.innerHTML = "";
-}
-
-function setupAuthPanelSwitching() {
-  document.querySelectorAll("[data-auth-panel]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      switchAuthPanel(button.getAttribute("data-auth-panel"));
-    });
-  });
-}
-
-function showAuthGate() {
-  ensureAuthGate();
-  const authGate = document.getElementById("authGate");
-  if (!authGate) return;
-
-  setupRegisterForm();
-  setupLoginForm();
-  setupPasswordToggles(authGate);
-  authGate.classList.add("active");
-  document.body.classList.add("auth-locked");
-}
-
-function hideAuthGate() {
-  const authGate = document.getElementById("authGate");
-  if (authGate) {
-    authGate.classList.remove("active");
-  }
-  document.body.classList.remove("auth-locked");
-}
-
-function setupRegisterForm() {
-  const form = document.getElementById("registerForm");
-  const alertBox = document.getElementById("authAlert");
-  if (!form || !alertBox) return;
-  if (form.dataset.authReady === "true") return;
-  form.dataset.authReady = "true";
-
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-    const fullName = document.getElementById("registerName").value.trim();
-    const email = document.getElementById("registerEmail").value.trim().toLowerCase();
-    const password = document.getElementById("registerPassword").value;
-    const confirmPassword = document.getElementById("confirmPassword").value;
-
-    if (!form.checkValidity()) {
-      form.classList.add("was-validated");
-      showAlert(alertBox, "warning", "Please complete all required fields correctly.");
-      return;
-    }
-
-    if (password.length < 6) {
-      showAlert(alertBox, "warning", "Password must be at least 6 characters long.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      showAlert(alertBox, "warning", "Passwords do not match.");
-      return;
-    }
-
-    const users = getUsers();
-    if (users.some(function (user) { return user.email.toLowerCase() === email; })) {
-      showAlert(alertBox, "warning", "An account with this email already exists. Please login instead.");
-      return;
-    }
-
-    users.push({ fullName: fullName, email: email, password: password });
-    saveUsers(users);
-    form.reset();
-    form.classList.remove("was-validated");
-    showAlert(alertBox, "success", "<strong>Registration successful!</strong><br>You can now proceed to login.");
-    setTimeout(function () { switchAuthPanel("loginPanel"); }, 700);
-  });
-}
-
-function setupLoginForm() {
-  const form = document.getElementById("loginForm");
-  const alertBox = document.getElementById("authAlert");
-  if (!form || !alertBox) return;
-  if (form.dataset.authReady === "true") return;
-  form.dataset.authReady = "true";
-
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim().toLowerCase();
-    const password = document.getElementById("loginPassword").value;
-
-    if (!form.checkValidity()) {
-      form.classList.add("was-validated");
-      showAlert(alertBox, "warning", "Please enter your email and password.");
-      return;
-    }
-
-    const user = getUsers().find(function (item) {
-      return item.email.toLowerCase() === email && item.password === password;
-    });
-
-    if (!user) {
-      showAlert(alertBox, "danger", "Login failed. Please check your details and try again.");
-      return;
-    }
-
-    setCurrentUser(user);
-    showAlert(alertBox, "success", "Welcome back, " + escapeHtml(getFirstName(user.fullName)) + ".");
-    setTimeout(function () {
-      hideAuthGate();
-      renderAuthNav();
-    }, 800);
-  });
-}
-
-function setupPasswordToggles(container) {
-  const scope = container || document;
-  scope.querySelectorAll("[data-password-toggle]").forEach(function (button) {
-    if (button.dataset.toggleReady === "true") return;
-    button.dataset.toggleReady = "true";
-
-    button.addEventListener("click", function () {
-      const input = document.getElementById(button.getAttribute("data-password-target"));
-      if (!input) return;
-
-      const showPassword = input.type === "password";
-      input.type = showPassword ? "text" : "password";
-      button.setAttribute("aria-label", showPassword ? "Hide password" : "Show password");
-      button.querySelector("span").innerHTML = showPassword ? "&#128065;&#8725;" : "&#128065;";
-    });
-  });
-}
-
 function setMinimumAppointmentDate() {
   const dateInput = document.getElementById("appointmentDate");
   if (dateInput) {
-    dateInput.min = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    dateInput.min = year + "-" + month + "-" + day;
   }
 }
 
@@ -403,13 +178,19 @@ function populateDoctorSelect() {
   if (!departmentSelect || !doctorSelect) return;
 
   const selectedService = getServiceByName(departmentSelect.value);
-  doctorSelect.innerHTML = '<option value="">Select doctor</option>' + selectedService.doctors.map(function (doctor) {
+  const availableDoctors = selectedService.doctors.filter(function (doctor) {
+    return doctor.available !== false;
+  });
+
+  doctorSelect.innerHTML = '<option value="">Select doctor</option>' + availableDoctors.map(function (doctor) {
     return '<option value="' + doctor.id + '">' + doctor.name + ' - ' + doctor.role + '</option>';
   }).join("");
 
-  doctorSelect.disabled = !departmentSelect.value;
+  doctorSelect.disabled = !departmentSelect.value || !availableDoctors.length;
   if (doctorHelper) {
-    doctorHelper.textContent = departmentSelect.value ? selectedService.hours : "Doctors are matched to the selected clinic department.";
+    doctorHelper.textContent = departmentSelect.value ?
+      (availableDoctors.length ? selectedService.hours : "No available doctors for this clinic department right now.") :
+      "Doctors are matched to the selected clinic department.";
   }
 }
 
@@ -424,6 +205,7 @@ function setupDoctorSelection() {
 function applyAppointmentPrefill() {
   const departmentSelect = document.getElementById("department");
   const doctorSelect = document.getElementById("doctor");
+  const doctorHelper = document.getElementById("doctorHelper");
   if (!departmentSelect || !doctorSelect) return;
 
   const params = new URLSearchParams(window.location.search);
@@ -435,8 +217,10 @@ function applyAppointmentPrefill() {
   departmentSelect.value = service.name;
   populateDoctorSelect();
 
-  if (doctorId && service.doctors.some(function (doctor) { return doctor.id === doctorId; })) {
+  if (doctorId && service.doctors.some(function (doctor) { return doctor.id === doctorId && doctor.available !== false; })) {
     doctorSelect.value = doctorId;
+  } else if (doctorId && doctorHelper) {
+    doctorHelper.textContent = "That doctor is currently unavailable. Please choose an available doctor.";
   }
 }
 
@@ -479,8 +263,32 @@ function validateAppointmentDateTime(dateValue, timeValue, service) {
   return "";
 }
 
+function validatePhoneNumber(phone) {
+  const value = String(phone || "").trim();
+  const digitsOnly = value.replace(/[\s-]/g, "").replace(/^\+/, "");
+
+  if (!/^\+?[0-9][0-9\s-]*$/.test(value)) {
+    return "Please enter a valid phone number using digits, spaces, hyphens, and an optional leading +.";
+  }
+
+  if (digitsOnly.length < 7 || digitsOnly.length > 15) {
+    return "Please enter a valid phone number with 7 to 15 digits.";
+  }
+
+  return "";
+}
+
+function getPassedTimeNote(appointment) {
+  const status = getDisplayStatus(appointment);
+  if (!hasScheduledTimePassed(appointment) || status === "Completed" || status === "Cancelled") {
+    return "";
+  }
+  return '<div class="time-passed-note">Scheduled time has passed.</div>';
+}
+
 function renderAppointmentSlip(appointment) {
   const status = getDisplayStatus(appointment);
+  const passedNote = getPassedTimeNote(appointment);
   return '<article class="appointment-slip" id="appointmentSlip">' +
     '<div class="slip-header">' +
     '<div><span class="section-kicker mb-1">Appointment Slip</span><h2>CampusCare Clinic Document</h2><p>Present this slip when you visit the campus clinic.</p></div>' +
@@ -497,6 +305,7 @@ function renderAppointmentSlip(appointment) {
     '<dt>Time</dt><dd>' + formatTime(appointment.appointmentTime) + '</dd>' +
     '<dt>Status</dt><dd>' + status + '</dd>' +
     '</dl>' +
+    passedNote +
     '<div class="slip-footer-note">CampusCare Student Clinic | Main Campus Clinic Desk | support@campuscare.local</div>' +
     '<div class="slip-actions">' +
     '<button type="button" class="btn btn-outline-primary" data-copy-id="' + escapeHtml(appointment.id) + '">Copy Appointment ID</button>' +
@@ -507,6 +316,7 @@ function renderAppointmentSlip(appointment) {
 
 function appointmentSlipHtml(appointment) {
   const status = getDisplayStatus(appointment);
+  const passedNote = getPassedTimeNote(appointment) ? '<p class="note">Scheduled time has passed.</p>' : '';
   return '<!doctype html>' +
     '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<title>CampusCare Appointment Slip</title>' +
@@ -516,7 +326,7 @@ function appointmentSlipHtml(appointment) {
     '.top{border-bottom:1px dashed #cbd5e1;display:flex;justify-content:space-between;gap:20px;padding-bottom:18px}' +
     'h1{color:#0057b8;font-size:28px;margin:0 0 6px}.muted{color:#64748b;margin:0}.badge{background:rgba(0,169,157,.15);border-radius:999px;color:#007b73;font-weight:700;height:max-content;padding:8px 14px}' +
     '.code{background:linear-gradient(135deg,rgba(0,87,184,.1),rgba(0,169,157,.12));border-radius:14px;margin:22px 0;padding:16px}.code span{color:#64748b;display:block;font-weight:700}.code strong{color:#0057b8;display:block;font-size:24px;letter-spacing:.04em}' +
-    'dl{display:grid;gap:12px 18px;grid-template-columns:190px 1fr;margin:0}dt{color:#64748b;font-weight:700}dd{font-weight:700;margin:0}.footer{border-top:1px dashed #cbd5e1;color:#64748b;margin-top:22px;padding-top:16px}' +
+    'dl{display:grid;gap:12px 18px;grid-template-columns:190px 1fr;margin:0}dt{color:#64748b;font-weight:700}dd{font-weight:700;margin:0}.note{background:rgba(250,204,21,.16);border:1px solid rgba(250,204,21,.35);border-radius:12px;color:#854d0e;font-weight:700;margin:18px 0 0;padding:12px}.footer{border-top:1px dashed #cbd5e1;color:#64748b;margin-top:22px;padding-top:16px}' +
     '@media(max-width:600px){body{padding:16px}.top{display:block}.badge{display:inline-block;margin-top:12px}dl{grid-template-columns:1fr}}' +
     '</style></head><body>' +
     '<article class="slip"><div class="top"><div><h1>CampusCare Appointment Slip</h1><p class="muted">CampusCare Student Clinic Appointment Document</p></div><span class="badge">' + status + '</span></div>' +
@@ -530,7 +340,7 @@ function appointmentSlipHtml(appointment) {
     '<dt>Date</dt><dd>' + formatDate(appointment.appointmentDate) + '</dd>' +
     '<dt>Time</dt><dd>' + formatTime(appointment.appointmentTime) + '</dd>' +
     '<dt>Status</dt><dd>' + status + '</dd>' +
-    '</dl><p class="footer">CampusCare Student Clinic | Main Campus Clinic Desk | Generated locally in your browser.</p></article>' +
+    '</dl>' + passedNote + '<p class="footer">CampusCare Student Clinic | Main Campus Clinic Desk | Generated locally in your browser.</p></article>' +
     '</body></html>';
 }
 
@@ -577,6 +387,44 @@ function setupAppointmentForm() {
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
+
+    const formData = new FormData(form);
+    const fullName = formData.get("fullName").trim();
+    const email = formData.get("email").trim();
+    const phone = formData.get("phone").trim();
+    const reason = formData.get("reason").trim();
+    const phoneMessage = validatePhoneNumber(phone);
+
+    if (!fullName) {
+      showAlert(alertBox, "warning", "Please enter your full name.");
+      return;
+    }
+
+    if (!reason) {
+      showAlert(alertBox, "warning", "Please enter your reason for visit.");
+      return;
+    }
+
+    if (!phone) {
+      showAlert(alertBox, "warning", "Please enter your phone number.");
+      return;
+    }
+
+    if (phoneMessage) {
+      showAlert(alertBox, "warning", phoneMessage);
+      return;
+    }
+
+    const service = getServiceByName(formData.get("department"));
+    const dateValue = formData.get("appointmentDate");
+    const timeValue = formData.get("appointmentTime");
+    const validationMessage = dateValue && timeValue ? validateAppointmentDateTime(dateValue, timeValue, service) : "";
+
+    if (validationMessage) {
+      showAlert(alertBox, "warning", validationMessage);
+      return;
+    }
+
     if (!form.checkValidity()) {
       form.classList.add("was-validated");
       if (slipArea) slipArea.innerHTML = "";
@@ -584,21 +432,26 @@ function setupAppointmentForm() {
       return;
     }
 
-    const formData = new FormData(form);
-    const service = getServiceByName(formData.get("department"));
-    const doctor = getDoctorById(service, formData.get("doctor"));
-    const validationMessage = validateAppointmentDateTime(formData.get("appointmentDate"), formData.get("appointmentTime"), service);
+    const selectedDoctorId = formData.get("doctor");
+    const doctor = service.doctors.find(function (doctor) {
+      return doctor.id === selectedDoctorId || doctor.name === selectedDoctorId;
+    });
 
-    if (validationMessage) {
-      showAlert(alertBox, "warning", validationMessage);
+    if (!doctor) {
+      showAlert(alertBox, "warning", "Please choose an available doctor for this service.");
+      return;
+    }
+
+    if (doctor.available === false) {
+      showAlert(alertBox, "warning", doctor.name + " is currently unavailable. Please choose an available doctor.");
       return;
     }
 
     const appointment = normalizeAppointment({
       id: generateAppointmentId(),
-      fullName: formData.get("fullName").trim(),
-      email: formData.get("email").trim(),
-      phone: formData.get("phone").trim(),
+      fullName: fullName,
+      email: email,
+      phone: phone,
       service: service.name,
       department: service.name,
       serviceId: service.id,
@@ -606,9 +459,9 @@ function setupAppointmentForm() {
       doctor: doctor.name,
       doctorRole: doctor.role,
       doctorRoom: doctor.room,
-      appointmentDate: formData.get("appointmentDate"),
-      appointmentTime: formData.get("appointmentTime"),
-      reason: formData.get("reason").trim(),
+      appointmentDate: dateValue,
+      appointmentTime: timeValue,
+      reason: reason,
       status: "Pending",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -641,6 +494,7 @@ function setupAppointmentForm() {
 
 function renderStatusTracker(appointment) {
   const status = getDisplayStatus(appointment);
+  const passedNote = getPassedTimeNote(appointment);
   return '<article class="tracking-card">' +
     '<div class="tracking-header"><div><span class="section-kicker mb-1">Appointment tracking</span><h2>' + escapeHtml(appointment.id) + '</h2><p>' + escapeHtml(appointment.service) + ' with ' + escapeHtml(appointment.doctor) + '</p></div><span class="badge rounded-pill badge-status ' + getStatusClass(status) + '">' + status + '</span></div>' +
     '<div class="tracking-progress ' + getStatusClass(status) + '"><span></span><span></span><span></span></div>' +
@@ -653,6 +507,7 @@ function renderStatusTracker(appointment) {
     '<dt>Date and Time</dt><dd>' + formatDate(appointment.appointmentDate) + ' at ' + formatTime(appointment.appointmentTime) + '</dd>' +
     '<dt>Current Status</dt><dd>' + status + '</dd>' +
     '</dl>' +
+    passedNote +
     '<div class="slip-actions"><button type="button" class="btn btn-outline-primary" data-copy-id="' + escapeHtml(appointment.id) + '">Copy Appointment ID</button><a class="btn btn-primary" href="appointment.html">Book Another Appointment</a></div>' +
     '</article>';
 }
@@ -697,9 +552,11 @@ function renderAppointmentCard(appointment) {
   const status = getDisplayStatus(appointment);
   const canCancel = status === "Pending" || status === "Confirmed";
   const canDelete = status === "Cancelled";
+  const passedNote = getPassedTimeNote(appointment);
   return '<article class="history-card">' +
     '<div class="history-card-top"><div><strong>' + escapeHtml(appointment.service) + '</strong><span>' + escapeHtml(appointment.id) + '</span></div><span class="badge rounded-pill badge-status ' + getStatusClass(status) + '">' + status + '</span></div>' +
     '<p class="mb-2">' + escapeHtml(appointment.doctor) + ' - ' + formatDate(appointment.appointmentDate) + ' - ' + formatTime(appointment.appointmentTime) + '</p>' +
+    passedNote +
     '<div class="history-actions"><button class="btn btn-outline-primary btn-sm" type="button" data-copy-id="' + escapeHtml(appointment.id) + '">Copy Appointment ID</button><button class="btn btn-outline-primary btn-sm" type="button" data-download-id="' + escapeHtml(appointment.id) + '">Download Slip</button><a class="btn btn-outline-primary btn-sm" href="status.html?id=' + encodeURIComponent(appointment.id) + '">View Appointment</a>' +
     (canCancel ? '<button class="btn btn-sm btn-cancel" type="button" data-cancel-id="' + escapeHtml(appointment.id) + '">Cancel</button>' : '') +
     (canDelete ? '<button class="btn btn-sm btn-cancel" type="button" data-delete-id="' + escapeHtml(appointment.id) + '">Delete</button>' : '') + '</div>' +
@@ -717,8 +574,7 @@ function getHistoryFilterConfig(filterName) {
       filter: function (appointment) {
         const status = getDisplayStatus(appointment);
         const appointmentDateTime = getAppointmentDateTime(appointment);
-        return status !== "Completed" &&
-          status !== "Cancelled" &&
+        return (status === "Pending" || status === "Confirmed") &&
           !Number.isNaN(appointmentDateTime.getTime()) &&
           appointmentDateTime >= new Date();
       }
@@ -772,7 +628,13 @@ function renderAppointmentHistory() {
 
   const groups = [
     { title: "Pending / Awaiting confirmation", filter: function (appointment) { return getDisplayStatus(appointment) === "Pending"; } },
-    { title: "Upcoming", filter: function (appointment) { return getDisplayStatus(appointment) === "Confirmed"; } },
+    { title: "Upcoming", filter: function (appointment) {
+      const status = getDisplayStatus(appointment);
+      const appointmentDateTime = getAppointmentDateTime(appointment);
+      return status === "Confirmed" &&
+        !Number.isNaN(appointmentDateTime.getTime()) &&
+        appointmentDateTime >= new Date();
+    } },
     { title: "Completed", filter: function (appointment) { return getDisplayStatus(appointment) === "Completed"; } },
     { title: "Cancelled", filter: function (appointment) { return getDisplayStatus(appointment) === "Cancelled"; } }
   ];
@@ -882,11 +744,14 @@ function renderDoctorsSection() {
     const bookingUrl = "appointment.html?service=" + encodeURIComponent(doctor.serviceId) + "&doctor=" + encodeURIComponent(doctor.id);
     const availabilityText = doctor.available ? "Available" : "Unavailable";
     const availabilityClass = doctor.available ? "available" : "unavailable";
+    const bookingAction = doctor.available ?
+      '<a class="btn btn-primary btn-sm" href="' + bookingUrl + '">Book Appointment</a>' :
+      '<button class="btn btn-outline-secondary btn-sm" type="button" disabled aria-disabled="true">Book Appointment</button>';
     return '<article class="clinic-doctor-card">' +
       '<div class="doctor-card-top"><div><h3>' + escapeHtml(doctor.name) + '</h3><p>' + escapeHtml(doctor.role) + '</p></div><span class="availability-pill ' + availabilityClass + '">' + availabilityText + '</span></div>' +
       '<strong class="doctor-meta">' + escapeHtml(doctor.service) + '</strong>' +
       '<span class="doctor-meta">' + escapeHtml(doctor.hours) + ' - ' + escapeHtml(doctor.room) + '</span>' +
-      '<div class="doctor-actions"><button class="btn btn-outline-primary btn-sm" type="button" data-doctor-profile="' + escapeHtml(doctor.id) + '">View Profile</button><a class="btn btn-primary btn-sm" href="' + bookingUrl + '">Book Appointment</a></div>' +
+      '<div class="doctor-actions"><button class="btn btn-outline-primary btn-sm" type="button" data-doctor-profile="' + escapeHtml(doctor.id) + '">View Profile</button>' + bookingAction + '</div>' +
       '</article>';
   }).join("");
 
@@ -945,10 +810,6 @@ function setupThemeToggle() {
 document.addEventListener("DOMContentLoaded", function () {
   applySavedTheme();
   setupThemeToggle();
-  renderAuthNav();
-  setupRegisterForm();
-  setupLoginForm();
-  setupPasswordToggles();
   setMinimumAppointmentDate();
   setupDoctorSelection();
   applyAppointmentPrefill();
