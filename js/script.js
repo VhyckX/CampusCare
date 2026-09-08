@@ -102,13 +102,60 @@ function normalizeAppointment(appointment) {
   };
 }
 
+function isAppointmentRecord(value) {
+  return value && typeof value === "object" && typeof value.id === "string" && value.id.trim();
+}
+
+function readStoredAppointmentData() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) {
+      return { appointments: [], damagedRecords: [], canSave: true, error: "" };
+    }
+
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) {
+      return {
+        appointments: [],
+        damagedRecords: [],
+        canSave: false,
+        error: "Saved appointment data is not in the expected format."
+      };
+    }
+
+    return {
+      appointments: parsed.filter(isAppointmentRecord),
+      damagedRecords: parsed.filter(function (record) { return !isAppointmentRecord(record); }),
+      canSave: true,
+      error: ""
+    };
+  } catch (error) {
+    return {
+      appointments: [],
+      damagedRecords: [],
+      canSave: false,
+      error: "Saved appointment data could not be read."
+    };
+  }
+}
+
 function getAppointments() {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  return saved.map(normalizeAppointment);
+  const stored = readStoredAppointmentData();
+  return stored.appointments.map(normalizeAppointment);
 }
 
 function saveAppointments(appointments) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(appointments.map(normalizeAppointment)));
+  const stored = readStoredAppointmentData();
+  if (!stored.canSave) {
+    throw new Error(stored.error || "Appointment storage is unavailable.");
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appointments.map(normalizeAppointment).concat(stored.damagedRecords)));
+}
+
+function getAppointmentStorageWarning() {
+  const stored = readStoredAppointmentData();
+  return stored.canSave ? "" : stored.error;
 }
 
 function generateAppointmentId() {
@@ -358,9 +405,11 @@ function downloadAppointmentSlip(appointment) {
 }
 
 function copyAppointmentId(appointmentId) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(appointmentId);
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    return Promise.reject(new Error("Clipboard copying is unavailable."));
   }
+
+  return navigator.clipboard.writeText(appointmentId);
 }
 
 function setupSlipActions(container) {
@@ -372,9 +421,14 @@ function setupSlipActions(container) {
 
   area.querySelectorAll("[data-copy-id]").forEach(function (button) {
     button.addEventListener("click", function () {
-      copyAppointmentId(button.getAttribute("data-copy-id"));
-      button.textContent = "Copied";
-      setTimeout(function () { button.textContent = "Copy Appointment ID"; }, 1600);
+      const appointmentId = button.getAttribute("data-copy-id");
+      const originalText = button.textContent;
+      copyAppointmentId(appointmentId).then(function () {
+        button.textContent = "Copied";
+        setTimeout(function () { button.textContent = originalText; }, 1600);
+      }).catch(function () {
+        window.alert("Copying is unavailable in this browser. Please copy this appointment ID manually: " + appointmentId);
+      });
     });
   });
 }
@@ -474,7 +528,14 @@ function setupAppointmentForm() {
 
     const appointments = getAppointments();
     appointments.push(appointment);
-    saveAppointments(appointments);
+
+    try {
+      saveAppointments(appointments);
+    } catch (error) {
+      showAlert(alertBox, "danger", "Your appointment could not be saved because browser storage is unavailable or damaged. Please try again without closing this page.");
+      return;
+    }
+
     latestAppointmentSlip = appointment;
 
     form.reset();
@@ -533,6 +594,12 @@ function setupStatusSearch() {
     }
 
     const searchId = input.value.trim().toUpperCase();
+    const storageWarning = getAppointmentStorageWarning();
+    if (storageWarning) {
+      result.innerHTML = '<div class="empty-state"><h2>Appointment storage needs attention.</h2><p class="mb-0">' + escapeHtml(storageWarning) + ' The damaged browser data was left unchanged.</p></div>';
+      return;
+    }
+
     const appointment = getAppointments().find(function (item) {
       return item.id.toUpperCase() === searchId;
     });
@@ -607,6 +674,12 @@ function renderAppointmentHistory() {
   const historyArea = document.getElementById("appointmentHistory");
   if (!historyArea) return;
 
+  const storageWarning = getAppointmentStorageWarning();
+  if (storageWarning) {
+    historyArea.innerHTML = '<div class="empty-state text-center"><h3>Appointment storage needs attention.</h3><p class="mb-0">' + escapeHtml(storageWarning) + ' The damaged browser data was left unchanged.</p></div>';
+    return;
+  }
+
   const appointments = getAppointments().sort(function (a, b) {
     return getAppointmentDateTime(a) - getAppointmentDateTime(b);
   });
@@ -634,6 +707,13 @@ function renderAppointmentHistory() {
       return status === "Confirmed" &&
         !Number.isNaN(appointmentDateTime.getTime()) &&
         appointmentDateTime >= new Date();
+    } },
+    { title: "Confirmed - Time Passed", filter: function (appointment) {
+      const status = getDisplayStatus(appointment);
+      const appointmentDateTime = getAppointmentDateTime(appointment);
+      return status === "Confirmed" &&
+        !Number.isNaN(appointmentDateTime.getTime()) &&
+        appointmentDateTime < new Date();
     } },
     { title: "Completed", filter: function (appointment) { return getDisplayStatus(appointment) === "Completed"; } },
     { title: "Cancelled", filter: function (appointment) { return getDisplayStatus(appointment) === "Cancelled"; } }
@@ -670,7 +750,14 @@ function setupHistoryActions(historyArea) {
         }
         return appointment;
       });
-      saveAppointments(appointments);
+
+      try {
+        saveAppointments(appointments);
+      } catch (error) {
+        window.alert("This appointment could not be cancelled because browser storage is unavailable or damaged. The record was left unchanged.");
+        return;
+      }
+
       renderAppointmentHistory();
     });
   });
@@ -684,7 +771,14 @@ function setupHistoryActions(historyArea) {
       const appointments = getAppointments().filter(function (appointment) {
         return appointment.id !== appointmentId || getDisplayStatus(appointment) !== "Cancelled";
       });
-      saveAppointments(appointments);
+
+      try {
+        saveAppointments(appointments);
+      } catch (error) {
+        window.alert("This cancelled appointment could not be deleted because browser storage is unavailable or damaged. The record was left unchanged.");
+        return;
+      }
+
       renderAppointmentHistory();
     });
   });
@@ -776,7 +870,12 @@ function setupDoctorFilters() {
 }
 
 function applySavedTheme() {
-  const savedTheme = localStorage.getItem(THEME_KEY);
+  let savedTheme = "";
+  try {
+    savedTheme = localStorage.getItem(THEME_KEY);
+  } catch (error) {
+    savedTheme = "";
+  }
   const useDarkMode = savedTheme === "dark";
   document.body.classList.toggle("dark-mode", useDarkMode);
   updateThemeToggle(useDarkMode);
@@ -802,7 +901,11 @@ function setupThemeToggle() {
   themeToggle.addEventListener("click", function () {
     const useDarkMode = !document.body.classList.contains("dark-mode");
     document.body.classList.toggle("dark-mode", useDarkMode);
-    localStorage.setItem(THEME_KEY, useDarkMode ? "dark" : "light");
+    try {
+      localStorage.setItem(THEME_KEY, useDarkMode ? "dark" : "light");
+    } catch (error) {
+      window.alert("Theme changed for this page, but your browser could not save the preference.");
+    }
     updateThemeToggle(useDarkMode);
   });
 }

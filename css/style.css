@@ -316,12 +316,15 @@ a:hover {
     box-shadow: var(--shadow)
 }
 
+.stat-card,
 .service-card,
 .step-card,
 .service-detail-card {
     transition: box-shadow .2s ease, transform .2s ease
 }
 
+.stat-card:hover,
+.stat-card:focus-within,
 .service-card:hover,
 .step-card:hover,
 .service-detail-card:hover {
@@ -652,6 +655,17 @@ a:hover {
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .stat-card {
+        transition: none
+    }
+
+    .stat-card:hover,
+    .stat-card:focus-within {
+        transform: none
+    }
+}
+
 .hero-photo-card {
     background: var(--white);
     border: 1px solid rgba(226, 232, 240, .85);
@@ -895,6 +909,21 @@ body.dark-mode .site-footer {
 
 body.dark-mode .navbar {
     border-bottom: 1px solid var(--border)
+}
+
+body.dark-mode .navbar .nav-link {
+    color: #fff
+}
+
+body.dark-mode .navbar .nav-link:hover,
+body.dark-mode .navbar .nav-link:focus,
+body.dark-mode .navbar .nav-link.active {
+    color: var(--teal)
+}
+
+body.dark-mode .navbar .nav-link:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 4px
 }
 
 body.dark-mode .navbar-toggler {
