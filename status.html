@@ -37,7 +37,7 @@
         <section class="page-hero">
             <div class="container"><span class="section-kicker">Track your visit</span>
                 <h1>Appointment Status</h1>
-                <p>Track a saved appointment using the appointment ID generated on this browser.</p>
+                <p>Track a backend appointment using the appointment reference and booking email.</p>
             </div>
         </section>
         <section class="section-padding">
@@ -45,19 +45,28 @@
                 <div class="row justify-content-center">
                     <div class="col-lg-8">
                         <div class="form-shell">
-                            <form id="statusForm" class="status-search" novalidate><label for="appointmentId"
-                                    class="form-label">Appointment ID</label>
-                                <div class="input-group input-group-lg"><input type="text" class="form-control"
-                                        id="appointmentId" placeholder="Example: CC-20260716-1234" required><button
-                                        class="btn btn-primary" type="submit">Search</button>
-                                    <div class="invalid-feedback">Please enter your appointment ID.</div>
+                            <form id="statusForm" class="status-search" novalidate>
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label for="appointmentId" class="form-label">Appointment
+                                            Reference</label><input type="text" class="form-control form-control-lg"
+                                            id="appointmentId" placeholder="Example: CC-20260716-1234" required>
+                                        <div class="invalid-feedback">Please enter your appointment reference.</div>
+                                    </div>
+                                    <div class="col-md-6"><label for="lookupEmail" class="form-label">Booking
+                                            Email</label><input type="email" class="form-control form-control-lg"
+                                            id="lookupEmail" placeholder="name@example.com" autocomplete="email"
+                                            required>
+                                        <div class="invalid-feedback">Please enter the booking email.</div>
+                                    </div>
+                                    <div class="col-12"><button class="btn btn-primary btn-lg w-100"
+                                            type="submit">Search</button></div>
                                 </div>
                             </form>
                             <div id="statusResult" class="status-result mt-4" aria-live="polite">
                                 <div class="empty-state">
                                     <h2>Track an appointment.</h2>
-                                    <p>Enter an appointment ID to see the clinic tracking details, current status,
-                                        patient information, service, doctor, date, and time.</p>
+                                    <p>Enter the appointment reference and booking email to see the current backend
+                                        appointment status.</p>
                                 </div>
                             </div>
                         </div>

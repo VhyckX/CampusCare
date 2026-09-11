@@ -11,13 +11,14 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, ".env") });
 
 const PORT = process.env.PORT || 5000;
+const DB_NAME = process.env.MONGODB_DB_NAME || "campuscare";
 
 let server;
 
 async function startServer() {
   try {
     configureDnsServers();
-    await connectDatabase();
+    await connectDatabase({ dbName: DB_NAME });
 
     server = app.listen(PORT, () => {
       console.log(`CampusCare API server running on port ${PORT}`);

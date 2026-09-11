@@ -1,9 +1,15 @@
 const STORAGE_KEY = "campusCareAppointments";
 const THEME_KEY = "campusCareTheme";
+const API_BASE_URL = (window.CAMPUSCARE_API_BASE_URL || "http://127.0.0.1:5000/api").replace(/\/$/, "");
 let latestAppointmentSlip = null;
 let currentHistoryFilter = "all";
+let isAppointmentSubmitting = false;
+let isStatusLookupSubmitting = false;
+let isBackendCancelSubmitting = false;
+let statusLookupSequence = 0;
+let currentBackendLookupContext = null;
 
-const clinicServices = [
+const fallbackClinicServices = [
   {
     id: "general-consultation",
     name: "General Consultation",
@@ -42,16 +48,27 @@ const clinicServices = [
   }
 ];
 
+let clinicServices = fallbackClinicServices.slice();
+const catalogState = {
+  loading: false,
+  loaded: false,
+  error: ""
+};
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>'"]/g, function (char) {
     return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char];
   });
 }
 
-function getServiceByName(name) {
+function findServiceByName(name) {
   return clinicServices.find(function (service) {
     return service.name === name || service.id === name;
-  }) || clinicServices[0];
+  });
+}
+
+function getServiceByName(name) {
+  return findServiceByName(name) || clinicServices[0] || fallbackClinicServices[0];
 }
 
 function getDoctorById(service, doctorId) {
@@ -207,6 +224,168 @@ function showAlert(target, type, message) {
   target.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
 }
 
+function showStaticAlert(target, type, message) {
+  if (!target) return;
+  target.innerHTML = '<div class="alert alert-' + type + '" role="alert">' + message + '</div>';
+}
+
+async function fetchApi(path, options) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(function () { controller.abort(); }, 10000);
+  const requestOptions = Object.assign({}, options || {}, { signal: controller.signal });
+  let response;
+  let payload = null;
+
+  try {
+    response = await fetch(API_BASE_URL + path, requestOptions);
+    payload = await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const networkError = new Error("The CampusCare API is unavailable or taking too long to respond.");
+    networkError.status = 0;
+    throw networkError;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    const message = payload && payload.message ? payload.message : "The CampusCare API request failed.";
+    const apiError = new Error(message);
+    apiError.status = response.status;
+    throw apiError;
+  }
+
+  return payload;
+}
+
+function mapServiceFromApi(service) {
+  return {
+    id: service.serviceIdentifier,
+    name: service.name,
+    hours: service.displayHours,
+    openingHours: service.openingHours || [],
+    doctors: []
+  };
+}
+
+function attachDoctorsToServices(services, doctors) {
+  const serviceMap = new Map(services.map(function (service) {
+    service.doctors = [];
+    return [service.id, service];
+  }));
+
+  doctors.forEach(function (doctor) {
+    const service = serviceMap.get(doctor.serviceIdentifier);
+    if (!service) return;
+
+    service.doctors.push({
+      id: doctor.doctorIdentifier,
+      name: doctor.name,
+      role: doctor.role,
+      room: doctor.room,
+      available: doctor.available !== false
+    });
+  });
+
+  return services;
+}
+
+async function loadCatalog() {
+  catalogState.loading = true;
+  catalogState.error = "";
+
+  try {
+    const responses = await Promise.all([
+      fetchApi("/services"),
+      fetchApi("/doctors")
+    ]);
+
+    const services = Array.isArray(responses[0].data) ? responses[0].data.map(mapServiceFromApi) : [];
+    const doctors = Array.isArray(responses[1].data) ? responses[1].data : [];
+    clinicServices = attachDoctorsToServices(services, doctors);
+    catalogState.loaded = true;
+  } catch (error) {
+    catalogState.error = "CampusCare catalog could not be loaded. Please make sure the backend API is running.";
+    catalogState.loaded = false;
+  } finally {
+    catalogState.loading = false;
+  }
+}
+
+function normalizeApiAppointment(appointment) {
+  return {
+    id: appointment.appointmentRef,
+    fullName: appointment.fullName,
+    email: appointment.email,
+    phone: appointment.phone,
+    service: appointment.serviceName,
+    serviceId: appointment.serviceIdentifier,
+    department: appointment.serviceName,
+    doctorId: appointment.doctorIdentifier,
+    doctor: appointment.doctorName,
+    doctorRole: appointment.doctorRole,
+    doctorRoom: appointment.doctorRoom,
+    appointmentDate: appointment.appointmentDate,
+    appointmentTime: appointment.appointmentTime,
+    reason: appointment.reason,
+    status: appointment.status || "Pending",
+    createdAt: appointment.createdAt,
+    updatedAt: appointment.updatedAt
+  };
+}
+
+function getApiErrorMessage(error) {
+  if (error && error.status === 409) {
+    return error.message || "That appointment slot is no longer available. Please choose another doctor or time.";
+  }
+
+  if (error && error.status === 400) {
+    return error.message || "Please check the appointment details and try again.";
+  }
+
+  if (error && error.status === 404) {
+    return error.message || "The selected service or doctor could not be found.";
+  }
+
+  return "CampusCare could not submit the appointment. Please check that the backend API is running and try again.";
+}
+
+function getLookupErrorMessage(error) {
+  if (error && error.status === 400) {
+    return error.message || "Please enter a valid appointment reference and booking email.";
+  }
+
+  if (error && error.status === 404) {
+    return error.message || "No appointment was found for those details.";
+  }
+
+  if (error && error.status === 429) {
+    return error.message || "Too many lookup attempts. Please wait before trying again.";
+  }
+
+  return "CampusCare could not check the appointment right now. Please make sure the backend API is running and try again.";
+}
+
+function getCancelErrorMessage(error) {
+  if (error && error.status === 400) {
+    return error.message || "Please check the appointment reference and booking email.";
+  }
+
+  if (error && error.status === 404) {
+    return error.message || "No appointment was found for those details.";
+  }
+
+  if (error && error.status === 409) {
+    return error.message || "This appointment can no longer be cancelled.";
+  }
+
+  if (error && error.status === 429) {
+    return error.message || "Too many attempts. Please wait before trying again.";
+  }
+
+  return "CampusCare could not cancel the appointment right now. Please make sure the backend API is running and try again.";
+}
+
 function setMinimumAppointmentDate() {
   const dateInput = document.getElementById("appointmentDate");
   if (dateInput) {
@@ -218,13 +397,48 @@ function setMinimumAppointmentDate() {
   }
 }
 
+function populateDepartmentSelect() {
+  const departmentSelect = document.getElementById("department");
+  if (!departmentSelect) return;
+
+  const selectedValue = departmentSelect.value;
+  const options = clinicServices.map(function (service) {
+    const selected = selectedValue === service.id || selectedValue === service.name ? " selected" : "";
+    return '<option value="' + escapeHtml(service.id) + '"' + selected + '>' + escapeHtml(service.name) + '</option>';
+  }).join("");
+
+  departmentSelect.innerHTML = '<option value="">Select department</option>' + options;
+  departmentSelect.disabled = !catalogState.loaded || catalogState.loading || Boolean(catalogState.error);
+}
+
 function populateDoctorSelect() {
   const departmentSelect = document.getElementById("department");
   const doctorSelect = document.getElementById("doctor");
   const doctorHelper = document.getElementById("doctorHelper");
   if (!departmentSelect || !doctorSelect) return;
 
-  const selectedService = getServiceByName(departmentSelect.value);
+  if (catalogState.loading) {
+    doctorSelect.innerHTML = '<option value="">Loading doctors...</option>';
+    doctorSelect.disabled = true;
+    if (doctorHelper) doctorHelper.textContent = "Loading clinic services from the CampusCare API.";
+    return;
+  }
+
+  if (!catalogState.loaded || catalogState.error) {
+    doctorSelect.innerHTML = '<option value="">Doctors unavailable</option>';
+    doctorSelect.disabled = true;
+    if (doctorHelper) doctorHelper.textContent = catalogState.error || "Clinic catalog is unavailable. Booking is paused.";
+    return;
+  }
+
+  const selectedService = findServiceByName(departmentSelect.value);
+  if (!selectedService) {
+    doctorSelect.innerHTML = '<option value="">Select a service first</option>';
+    doctorSelect.disabled = true;
+    if (doctorHelper) doctorHelper.textContent = "Doctors are matched to the selected clinic department.";
+    return;
+  }
+
   const availableDoctors = selectedService.doctors.filter(function (doctor) {
     return doctor.available !== false;
   });
@@ -245,6 +459,7 @@ function setupDoctorSelection() {
   const departmentSelect = document.getElementById("department");
   if (!departmentSelect) return;
 
+  populateDepartmentSelect();
   populateDoctorSelect();
   departmentSelect.addEventListener("change", populateDoctorSelect);
 }
@@ -260,8 +475,15 @@ function applyAppointmentPrefill() {
   const doctorId = params.get("doctor");
   if (!serviceId) return;
 
-  const service = getServiceByName(serviceId);
-  departmentSelect.value = service.name;
+  const service = findServiceByName(serviceId);
+  if (!service) {
+    if (doctorHelper) {
+      doctorHelper.textContent = "The requested clinic department could not be found in the current catalog.";
+    }
+    return;
+  }
+
+  departmentSelect.value = service.id;
   populateDoctorSelect();
 
   if (doctorId && service.doctors.some(function (doctor) { return doctor.id === doctorId && doctor.available !== false; })) {
@@ -433,14 +655,29 @@ function setupSlipActions(container) {
   });
 }
 
+function setAppointmentSubmitting(form, isSubmitting) {
+  isAppointmentSubmitting = isSubmitting;
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (!submitButton) return;
+
+  submitButton.disabled = isSubmitting;
+  submitButton.textContent = isSubmitting ? "Submitting Appointment..." : "Submit Appointment";
+}
+
 function setupAppointmentForm() {
   const form = document.getElementById("appointmentForm");
   const alertBox = document.getElementById("formAlert");
   const slipArea = document.getElementById("appointmentSlipArea");
   if (!form || !alertBox) return;
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
+    if (isAppointmentSubmitting) return;
+
+    if (!catalogState.loaded || catalogState.error) {
+      showAlert(alertBox, "warning", "Clinic services are not available yet. Please make sure the backend API is running before booking.");
+      return;
+    }
 
     const formData = new FormData(form);
     const fullName = formData.get("fullName").trim();
@@ -469,7 +706,7 @@ function setupAppointmentForm() {
       return;
     }
 
-    const service = getServiceByName(formData.get("department"));
+    const service = findServiceByName(formData.get("department"));
     const dateValue = formData.get("appointmentDate");
     const timeValue = formData.get("appointmentTime");
     const validationMessage = dateValue && timeValue ? validateAppointmentDateTime(dateValue, timeValue, service) : "";
@@ -487,7 +724,7 @@ function setupAppointmentForm() {
     }
 
     const selectedDoctorId = formData.get("doctor");
-    const doctor = service.doctors.find(function (doctor) {
+    const doctor = service && service.doctors.find(function (doctor) {
       return doctor.id === selectedDoctorId || doctor.name === selectedDoctorId;
     });
 
@@ -501,55 +738,47 @@ function setupAppointmentForm() {
       return;
     }
 
-    const appointment = normalizeAppointment({
-      id: generateAppointmentId(),
-      fullName: fullName,
-      email: email,
-      phone: phone,
-      service: service.name,
-      department: service.name,
-      serviceId: service.id,
-      doctorId: doctor.id,
-      doctor: doctor.name,
-      doctorRole: doctor.role,
-      doctorRoom: doctor.room,
-      appointmentDate: dateValue,
-      appointmentTime: timeValue,
-      reason: reason,
-      status: "Pending",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-
-    if (hasDuplicateAppointment(appointment)) {
-      showAlert(alertBox, "warning", "That doctor already has an active appointment at the selected date and time. Please choose another time or doctor.");
-      return;
-    }
-
-    const appointments = getAppointments();
-    appointments.push(appointment);
-
     try {
-      saveAppointments(appointments);
+      setAppointmentSubmitting(form, true);
+      const payload = {
+        fullName: fullName,
+        email: email,
+        phone: phone,
+        reason: reason,
+        serviceIdentifier: service.id,
+        doctorIdentifier: doctor.id,
+        appointmentDate: dateValue,
+        appointmentTime: timeValue
+      };
+      const response = await fetchApi("/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response || response.success !== true || !response.data) {
+        throw new Error("CampusCare did not return the saved appointment details.");
+      }
+
+      const appointment = normalizeApiAppointment(response.data);
+      latestAppointmentSlip = appointment;
+
+      form.reset();
+      form.classList.remove("was-validated");
+      populateDepartmentSelect();
+      populateDoctorSelect();
+      showAlert(alertBox, "success", "<strong>&#10003; Appointment booked successfully!</strong><br>Your Appointment ID: <strong>" + appointment.id + "</strong><br>Please save this ID. Backend status lookup will be connected in the next task.");
+
+      if (slipArea) {
+        slipArea.innerHTML = renderAppointmentSlip(appointment);
+        setupSlipActions(slipArea);
+        slipArea.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     } catch (error) {
-      showAlert(alertBox, "danger", "Your appointment could not be saved because browser storage is unavailable or damaged. Please try again without closing this page.");
-      return;
+      showAlert(alertBox, error.status === 409 ? "warning" : "danger", getApiErrorMessage(error));
+    } finally {
+      setAppointmentSubmitting(form, false);
     }
-
-    latestAppointmentSlip = appointment;
-
-    form.reset();
-    form.classList.remove("was-validated");
-    populateDoctorSelect();
-    showAlert(alertBox, "success", "<strong>&#10003; Appointment booked successfully!</strong><br>Your Appointment ID: <strong>" + appointment.id + "</strong><br>Please save this ID. You will need it to check your appointment status later.");
-
-    if (slipArea) {
-      slipArea.innerHTML = renderAppointmentSlip(appointment);
-      setupSlipActions(slipArea);
-      slipArea.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-
-    renderAppointmentHistory();
   });
 }
 
@@ -573,45 +802,214 @@ function renderStatusTracker(appointment) {
     '</article>';
 }
 
+function isBackendAppointmentCancellable(appointment) {
+  const status = appointment.status || "Pending";
+  return (status === "Pending" || status === "Confirmed") && !hasScheduledTimePassed({
+    appointmentDate: appointment.appointmentDate,
+    appointmentTime: appointment.appointmentTime,
+    status: status
+  });
+}
+
+function renderBackendStatusTracker(appointment, lookupContext) {
+  const status = appointment.status || "Pending";
+  const passedNote = getPassedTimeNote({
+    appointmentDate: appointment.appointmentDate,
+    appointmentTime: appointment.appointmentTime,
+    status: status
+  });
+  const cancelButton = lookupContext && isBackendAppointmentCancellable(appointment)
+    ? '<button type="button" class="btn btn-cancel" data-backend-cancel-ref="' + escapeHtml(lookupContext.appointmentRef) + '">Cancel Appointment</button>'
+    : "";
+
+  return '<article class="tracking-card">' +
+    '<div class="tracking-header"><div><span class="section-kicker mb-1">Backend appointment tracking</span><h2>' + escapeHtml(appointment.appointmentRef) + '</h2><p>' + escapeHtml(appointment.serviceName) + ' with ' + escapeHtml(appointment.doctorName) + '</p></div><span class="badge rounded-pill badge-status ' + getStatusClass(status) + '">' + escapeHtml(status) + '</span></div>' +
+    '<div class="tracking-progress ' + getStatusClass(status) + '"><span></span><span></span><span></span></div>' +
+    '<dl class="slip-details tracking-details">' +
+    '<dt>Service</dt><dd>' + escapeHtml(appointment.serviceName) + '</dd>' +
+    '<dt>Doctor</dt><dd>' + escapeHtml(appointment.doctorName) + (appointment.doctorRole ? ' (' + escapeHtml(appointment.doctorRole) + ')' : '') + '</dd>' +
+    '<dt>Clinic Room</dt><dd>' + escapeHtml(appointment.doctorRoom || "Not set") + '</dd>' +
+    '<dt>Date and Time</dt><dd>' + formatDate(appointment.appointmentDate) + ' at ' + formatTime(appointment.appointmentTime) + '</dd>' +
+    '<dt>Current Status</dt><dd>' + escapeHtml(status) + '</dd>' +
+    '</dl>' +
+    passedNote +
+    '<div id="backendStatusActionAlert"></div>' +
+    '<div class="slip-actions"><button type="button" class="btn btn-outline-primary" data-copy-id="' + escapeHtml(appointment.appointmentRef) + '">Copy Appointment ID</button>' + cancelButton + '<a class="btn btn-primary" href="appointment.html">Book Another Appointment</a></div>' +
+    '</article>';
+}
+
+function renderOlderDemoStatusTracker(appointment) {
+  return '<div class="mt-4"><div class="alert alert-info mb-3" role="alert"><strong>Older demo booking.</strong> This record was saved in this browser before backend status lookup was connected.</div>' +
+    renderStatusTracker(appointment) +
+    '</div>';
+}
+
+function setStatusLookupSubmitting(form, isSubmitting) {
+  isStatusLookupSubmitting = isSubmitting;
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (!submitButton) return;
+
+  submitButton.disabled = isSubmitting;
+  submitButton.textContent = isSubmitting ? "Checking..." : "Search";
+}
+
+function setupBackendCancelAction(result, lookupContext) {
+  const cancelButton = result.querySelector("[data-backend-cancel-ref]");
+  if (!cancelButton || !lookupContext) return;
+
+  cancelButton.addEventListener("click", async function () {
+    if (isBackendCancelSubmitting) return;
+
+    if (!window.confirm("Cancel this appointment?")) {
+      return;
+    }
+
+    if (currentBackendLookupContext !== lookupContext) {
+      return;
+    }
+
+    const originalText = cancelButton.textContent;
+    const actionAlert = result.querySelector("#backendStatusActionAlert");
+    if (actionAlert) actionAlert.innerHTML = "";
+    isBackendCancelSubmitting = true;
+    cancelButton.disabled = true;
+    cancelButton.textContent = "Cancelling...";
+
+    try {
+      const response = await fetchApi("/appointments/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentRef: lookupContext.appointmentRef,
+          email: lookupContext.email
+        })
+      });
+
+      if (currentBackendLookupContext !== lookupContext) {
+        return;
+      }
+
+      if (!response || response.success !== true || !response.data) {
+        throw new Error("CampusCare did not return the cancelled appointment details.");
+      }
+
+      currentBackendLookupContext = {
+        appointmentRef: response.data.appointmentRef,
+        email: lookupContext.email,
+        sequence: lookupContext.sequence
+      };
+      result.innerHTML = renderBackendStatusTracker(response.data, currentBackendLookupContext);
+      setupSlipActions(result);
+      setupBackendCancelAction(result, currentBackendLookupContext);
+    } catch (error) {
+      if (currentBackendLookupContext !== lookupContext) {
+        return;
+      }
+
+      if (actionAlert) {
+        actionAlert.innerHTML = '<div class="alert alert-danger" role="alert">' + escapeHtml(getCancelErrorMessage(error)) + '</div>';
+      }
+      cancelButton.disabled = false;
+      cancelButton.textContent = originalText;
+    } finally {
+      isBackendCancelSubmitting = false;
+    }
+  });
+}
+
 function setupStatusSearch() {
   const form = document.getElementById("statusForm");
   const input = document.getElementById("appointmentId");
+  const emailInput = document.getElementById("lookupEmail");
   const result = document.getElementById("statusResult");
-  if (!form || !input || !result) return;
+  if (!form || !input || !emailInput || !result) return;
 
   const params = new URLSearchParams(window.location.search);
   const appointmentId = params.get("id");
   if (appointmentId) {
     input.value = appointmentId;
-    setTimeout(function () { form.requestSubmit(); }, 0);
   }
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
+    if (isStatusLookupSubmitting) return;
+
     if (!form.checkValidity()) {
       form.classList.add("was-validated");
       return;
     }
 
     const searchId = input.value.trim().toUpperCase();
-    const storageWarning = getAppointmentStorageWarning();
-    if (storageWarning) {
-      result.innerHTML = '<div class="empty-state"><h2>Appointment storage needs attention.</h2><p class="mb-0">' + escapeHtml(storageWarning) + ' The damaged browser data was left unchanged.</p></div>';
+    const bookingEmail = emailInput.value.trim().toLowerCase();
+    const lookupSequence = statusLookupSequence + 1;
+    statusLookupSequence = lookupSequence;
+    currentBackendLookupContext = null;
+
+    if (!searchId || searchId.length > 40 || !/^CC-\d{8}-\d{4,}$/.test(searchId)) {
+      result.innerHTML = '<div class="empty-state"><h2>Check the reference.</h2><p class="mb-0">Please enter a valid appointment reference such as CC-20260716-1234.</p></div>';
       return;
     }
 
-    const appointment = getAppointments().find(function (item) {
-      return item.id.toUpperCase() === searchId;
-    });
-
-    if (!appointment) {
-      result.innerHTML = '<div class="empty-state"><h2>No appointment found.</h2><p class="mb-0">Please check the appointment ID and try again. Appointment records are stored locally in this browser.</p></div>';
+    if (!bookingEmail || bookingEmail.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) {
+      result.innerHTML = '<div class="empty-state"><h2>Check the email.</h2><p class="mb-0">Please enter the email address used during booking.</p></div>';
       return;
     }
 
-    form.classList.remove("was-validated");
-    result.innerHTML = renderStatusTracker(appointment);
-    setupSlipActions(result);
+    result.innerHTML = '<div class="empty-state"><h2>Checking appointment.</h2><p class="mb-0">Please wait while CampusCare checks the backend appointment record.</p></div>';
+    setStatusLookupSubmitting(form, true);
+
+    try {
+      const response = await fetchApi("/appointments/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentRef: searchId,
+          email: bookingEmail
+        })
+      });
+
+      if (!response || response.success !== true || !response.data) {
+        throw new Error("CampusCare did not return appointment status details.");
+      }
+
+      if (lookupSequence !== statusLookupSequence) {
+        return;
+      }
+
+      currentBackendLookupContext = {
+        appointmentRef: response.data.appointmentRef,
+        email: bookingEmail,
+        sequence: lookupSequence
+      };
+      form.classList.remove("was-validated");
+      result.innerHTML = renderBackendStatusTracker(response.data, currentBackendLookupContext);
+      setupSlipActions(result);
+      setupBackendCancelAction(result, currentBackendLookupContext);
+    } catch (error) {
+      if (lookupSequence !== statusLookupSequence) {
+        return;
+      }
+
+      const message = getLookupErrorMessage(error);
+      let olderDemoHtml = "";
+
+      if (error.status === 404) {
+        const storageWarning = getAppointmentStorageWarning();
+        if (!storageWarning) {
+          const olderDemoAppointment = getAppointments().find(function (item) {
+            return item.id.toUpperCase() === searchId;
+          });
+          if (olderDemoAppointment) {
+            olderDemoHtml = renderOlderDemoStatusTracker(olderDemoAppointment);
+          }
+        }
+      }
+
+      result.innerHTML = '<div class="empty-state"><h2>Appointment not verified.</h2><p class="mb-0">' + escapeHtml(message) + '</p></div>' + olderDemoHtml;
+      setupSlipActions(result);
+    } finally {
+      setStatusLookupSubmitting(form, false);
+    }
   });
 }
 
@@ -803,7 +1201,22 @@ function setupHistoryFilters() {
 
 function renderServiceDoctors() {
   document.querySelectorAll("[data-service-doctors]").forEach(function (container) {
-    const service = getServiceByName(container.getAttribute("data-service-doctors"));
+    if (catalogState.loading) {
+      container.innerHTML = '<h3>Available doctors</h3><p class="mb-0 text-muted">Loading doctors...</p>';
+      return;
+    }
+
+    if (!catalogState.loaded || catalogState.error) {
+      container.innerHTML = '<h3>Available doctors</h3><p class="mb-0 text-muted">Doctor details are unavailable right now.</p>';
+      return;
+    }
+
+    const service = findServiceByName(container.getAttribute("data-service-doctors"));
+    if (!service) {
+      container.innerHTML = '<h3>Available doctors</h3><p class="mb-0 text-muted">No doctors found for this service.</p>';
+      return;
+    }
+
     container.innerHTML = '<h3>Available doctors</h3>' + service.doctors.map(function (doctor) {
       return '<div class="doctor-row"><strong>' + escapeHtml(doctor.name) + '</strong><span>' + escapeHtml(doctor.role) + ' - ' + escapeHtml(doctor.room) + '</span></div>';
     }).join("");
@@ -813,6 +1226,16 @@ function renderServiceDoctors() {
 function renderDoctorsSection() {
   const doctorsGrid = document.getElementById("doctorsGrid");
   if (!doctorsGrid) return;
+
+  if (catalogState.loading) {
+    doctorsGrid.innerHTML = '<div class="empty-state text-center doctors-empty"><h3>Loading doctors.</h3><p class="mb-0">Fetching the clinic catalog from the CampusCare API.</p></div>';
+    return;
+  }
+
+  if (!catalogState.loaded || catalogState.error) {
+    doctorsGrid.innerHTML = '<div class="empty-state text-center doctors-empty"><h3>Doctors unavailable.</h3><p class="mb-0">' + escapeHtml(catalogState.error || "The clinic catalog could not be loaded.") + '</p></div>';
+    return;
+  }
 
   const searchInput = document.getElementById("doctorSearch");
   const availabilityFilter = document.getElementById("doctorAvailabilityFilter");
@@ -910,12 +1333,12 @@ function setupThemeToggle() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
   applySavedTheme();
   setupThemeToggle();
   setMinimumAppointmentDate();
+  const catalogPromise = loadCatalog();
   setupDoctorSelection();
-  applyAppointmentPrefill();
   setupAppointmentForm();
   setupStatusSearch();
   setupHistoryFilters();
@@ -923,4 +1346,10 @@ document.addEventListener("DOMContentLoaded", function () {
   renderServiceDoctors();
   setupDoctorFilters();
   renderDoctorsSection();
+  await catalogPromise;
+  populateDepartmentSelect();
+  populateDoctorSelect();
+  renderServiceDoctors();
+  renderDoctorsSection();
+  applyAppointmentPrefill();
 });

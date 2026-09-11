@@ -92,8 +92,9 @@ function getSanitizedExplanation(category) {
   return explanations[category] || explanations.unknown;
 }
 
-export async function connectDatabase() {
+export async function connectDatabase(options = {}) {
   const mongoUri = process.env.MONGODB_URI;
+  const dbName = options.dbName || "campuscare";
 
   if (!mongoUri) {
     throw new Error("MongoDB connection failed. Category: malformed URI. Code: none.");
@@ -101,7 +102,7 @@ export async function connectDatabase() {
 
   try {
     await mongoose.connect(mongoUri, {
-      dbName: "campuscare",
+      dbName,
       serverSelectionTimeoutMS: 10000,
       connectTimeoutMS: 10000,
       socketTimeoutMS: 10000
