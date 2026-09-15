@@ -103,6 +103,48 @@ Expected response:
 
 This health endpoint only confirms that the Express server is running. The server connects to MongoDB before it starts listening, but this endpoint does not create, read, update, or delete database records.
 
+## Render Deployment
+
+Deploy CampusCare as one Render Web Service from the repository root so Express can serve both the frontend pages and the backend API.
+
+Render settings:
+
+```text
+Root Directory: leave blank / repository root
+Build Command: cd backend && npm install
+Start Command: cd backend && npm start
+```
+
+Required Render environment-variable names:
+
+```text
+NODE_ENV=production
+MONGODB_URI
+MONGODB_DB_NAME=campuscare
+SESSION_SECRET
+SESSION_TTL_MINUTES=120
+SESSION_COOKIE_NAME=campuscare.sid
+SESSION_COOKIE_SAMESITE=lax
+SESSION_COLLECTION_NAME=admin_sessions
+```
+
+Do not place secret values in the repository. `SESSION_SECRET` must be a strong random value of at least 32 characters. Render provides HTTPS and proxy forwarding, so production cookies are configured as `HttpOnly` and `Secure`, and the Express app trusts Render's proxy when `NODE_ENV=production`.
+
+`DNS_SERVERS` is for local troubleshooting only and should be left unset on Render unless you intentionally need custom DNS there. `CORS_ORIGINS` is not required when the deployed frontend and `/api` are served from the same Render origin.
+
+The deployed Express service serves only these public pages and asset folders:
+
+- `index.html`
+- `services.html`
+- `appointment.html`
+- `status.html`
+- `admin-login.html`
+- `/css`
+- `/js`
+- `/images`
+
+It does not expose `backend/`, `.env`, package files, Git files, or the repository root directory listing.
+
 ## Demo Catalog Seed
 
 CampusCare includes a prepared seed command for the same demo services and doctors shown on the frontend. Run it only when you intentionally want to add the demo catalog to MongoDB Atlas:

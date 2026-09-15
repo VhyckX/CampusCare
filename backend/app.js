@@ -1,19 +1,30 @@
 import express from "express";
 import "./config/env.js";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import adminAuthRoutes from "./routes/adminAuth.routes.js";
 import appointmentRoutes from "./routes/appointment.routes.js";
 import catalogRoutes from "./routes/catalog.routes.js";
 import healthRoutes from "./routes/health.routes.js";
-import { configureDnsServers } from "./config/dns.js";
 import { createSessionMiddleware } from "./config/session.js";
 
-configureDnsServers();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const publicRoot = resolve(__dirname, "..");
+const publicPages = new Map([
+  ["/", "index.html"],
+  ["/index.html", "index.html"],
+  ["/appointment.html", "appointment.html"],
+  ["/status.html", "status.html"],
+  ["/services.html", "services.html"],
+  ["/admin-login.html", "admin-login.html"]
+]);
 
 const app = express();
 let sessionMiddleware;
 
-export function configureSessionMiddleware() {
-  sessionMiddleware = createSessionMiddleware();
+export function configureSessionMiddleware(customMiddleware) {
+  sessionMiddleware = customMiddleware || createSessionMiddleware();
 }
 
 app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : 0);
@@ -54,7 +65,25 @@ app.use("/api", catalogRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/admin-auth", adminAuthRoutes);
 
+app.use("/css", express.static(resolve(publicRoot, "css"), {
+  index: false
+}));
+app.use("/js", express.static(resolve(publicRoot, "js"), {
+  index: false
+}));
+app.use("/images", express.static(resolve(publicRoot, "images"), {
+  index: false
+}));
+
+app.get(Array.from(publicPages.keys()), (req, res) => {
+  res.sendFile(resolve(publicRoot, publicPages.get(req.path)));
+});
+
 app.use((req, res) => {
+  if (!req.path.startsWith("/api")) {
+    return res.status(404).type("text/plain").send("Page not found");
+  }
+
   res.status(404).json({
     success: false,
     message: "API route not found"

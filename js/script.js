@@ -1,6 +1,8 @@
 const STORAGE_KEY = "campusCareAppointments";
 const THEME_KEY = "campusCareTheme";
-const API_BASE_URL = (window.CAMPUSCARE_API_BASE_URL || "http://127.0.0.1:5000/api").replace(/\/$/, "");
+const localFrontendPorts = ["5500", "5501", "5502", "5503", "5504", "5505"];
+const defaultApiBaseUrl = localFrontendPorts.includes(window.location.port) ? "http://127.0.0.1:5000/api" : "/api";
+const API_BASE_URL = (window.CAMPUSCARE_API_BASE_URL || defaultApiBaseUrl).replace(/\/$/, "");
 let latestAppointmentSlip = null;
 let currentHistoryFilter = "all";
 let isAppointmentSubmitting = false;

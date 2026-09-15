@@ -8,8 +8,23 @@ const DB_NAME = process.env.MONGODB_DB_NAME || "campuscare";
 
 let server;
 
+function validateProductionConfig() {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const missing = [];
+  if (!process.env.MONGODB_URI) missing.push("MONGODB_URI");
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+    missing.push("SESSION_SECRET");
+  }
+
+  if (missing.length) {
+    throw new Error(`Missing required production configuration: ${missing.join(", ")}.`);
+  }
+}
+
 async function startServer() {
   try {
+    validateProductionConfig();
     configureDnsServers();
     await connectDatabase({ dbName: DB_NAME });
     configureSessionMiddleware();
