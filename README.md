@@ -408,6 +408,7 @@ Only use this as a local troubleshooting setting. A DNS server address provided 
 - `backend/routes/catalog.routes.js` and `backend/controllers/catalog.controller.js` - Provide read-only services/doctors catalog APIs.
 - `backend/routes/appointment.routes.js` and `backend/controllers/appointment.controller.js` - Create bookings, look up appointment status, and cancel eligible guest appointments through the backend API.
 - `backend/routes/adminAuth.routes.js` and `backend/controllers/adminAuth.controller.js` - Provide admin login, logout, current-admin, and CSRF-token endpoints.
+- `backend/routes/admin.routes.js` and `backend/controllers/adminAppointment.controller.js` - Provide the protected clinic-admin appointment list and approval endpoint.
 - `backend/routes/health.routes.js` - Defines the `/api/health` route.
 - `backend/controllers/health.controller.js` - Sends the health-check JSON response.
 - `backend/.env.example` - Shows the required environment variable format.
@@ -422,4 +423,4 @@ CampusCare appointment forms use the Nigerian clinic's local calendar date and t
 
 Appointment status is stored separately and must not be changed automatically just because `scheduledAt` is in the past.
 
-No public doctor registration, student authentication, frontend framework, staff appointment-management dashboard, or external PDF conversion service is included yet.
+No public doctor registration, student authentication, frontend framework, broad staff dashboard, or external PDF conversion service is included yet. The current clinic-admin dashboard is limited to protected appointment viewing, filtering, pagination, and approval of eligible future pending appointments.

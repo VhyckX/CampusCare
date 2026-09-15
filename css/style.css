@@ -474,6 +474,60 @@ a:hover {
     border-top-left-radius: 0
 }
 
+.admin-dashboard-shell {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 1.5rem
+}
+
+.admin-dashboard-header,
+.admin-pagination {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between
+}
+
+.admin-filter-bar {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 1.5rem
+}
+
+.admin-filter-actions {
+    align-items: end;
+    display: flex;
+    gap: .75rem
+}
+
+.admin-table-wrap {
+    overflow-x: auto
+}
+
+.admin-appointments-table {
+    min-width: 840px
+}
+
+.admin-appointments-table th {
+    color: var(--muted);
+    font-size: .82rem;
+    text-transform: uppercase
+}
+
+.admin-appointments-table td,
+.admin-appointments-table th {
+    padding: .9rem
+}
+
+.admin-table-state {
+    color: var(--muted);
+    font-weight: 700;
+    text-align: center
+}
+
 .tip-list {
     display: grid;
     gap: 1rem;
@@ -992,7 +1046,8 @@ body.dark-mode .empty-state,
 body.dark-mode .appointment-summary,
 body.dark-mode .slip-code,
 body.dark-mode .admin-auth-shell,
-body.dark-mode .admin-signed-in {
+body.dark-mode .admin-signed-in,
+body.dark-mode .admin-dashboard-shell {
     background: #101827
 }
 
@@ -1030,6 +1085,17 @@ body.dark-mode .site-footer {
 @media (max-width: 991.98px) {
     .theme-toggle {
         margin-top: .5rem
+    }
+
+    .admin-filter-bar {
+        grid-template-columns: 1fr
+    }
+
+    .admin-dashboard-header,
+    .admin-pagination,
+    .admin-filter-actions {
+        align-items: stretch;
+        flex-direction: column
     }
 }
 
@@ -1377,8 +1443,16 @@ body.dark-mode .clinic-doctor-card {
 
 body.dark-mode .history-card,
 body.dark-mode .tracking-details,
-body.dark-mode .doctor-row {
+body.dark-mode .doctor-row,
+body.dark-mode .admin-appointments-table {
     background: #101827
+}
+
+body.dark-mode .admin-appointments-table td,
+body.dark-mode .admin-appointments-table th {
+    background: #101827;
+    border-color: var(--border);
+    color: var(--text)
 }
 
 body.dark-mode .badge-status.status-pending {

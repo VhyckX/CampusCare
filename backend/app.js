@@ -3,6 +3,7 @@ import "./config/env.js";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import adminAuthRoutes from "./routes/adminAuth.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 import appointmentRoutes from "./routes/appointment.routes.js";
 import catalogRoutes from "./routes/catalog.routes.js";
 import healthRoutes from "./routes/health.routes.js";
@@ -17,7 +18,8 @@ const publicPages = new Map([
   ["/appointment.html", "appointment.html"],
   ["/status.html", "status.html"],
   ["/services.html", "services.html"],
-  ["/admin-login.html", "admin-login.html"]
+  ["/admin-login.html", "admin-login.html"],
+  ["/admin-dashboard.html", "admin-dashboard.html"]
 ]);
 
 const app = express();
@@ -64,6 +66,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api", catalogRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/admin-auth", adminAuthRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use("/css", express.static(resolve(publicRoot, "css"), {
   index: false

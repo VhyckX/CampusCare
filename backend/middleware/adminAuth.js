@@ -30,6 +30,8 @@ export function requireCsrfToken(req, res, next) {
 }
 
 export async function requireAuthenticatedAdmin(req, res, next) {
+  res.set("Cache-Control", "no-store");
+
   try {
     const adminAccountId = req.session?.adminAccountId;
 

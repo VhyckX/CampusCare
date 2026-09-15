@@ -10,6 +10,10 @@ let isStatusLookupSubmitting = false;
 let isBackendCancelSubmitting = false;
 let statusLookupSequence = 0;
 let currentBackendLookupContext = null;
+let adminAppointmentsPage = 1;
+let adminAppointmentsTotalPages = 1;
+let adminAppointmentsRequestSequence = 0;
+let adminApprovalRequestSequence = 0;
 
 const fallbackClinicServices = [
   {
@@ -1574,6 +1578,269 @@ function setupAdminLoginPage() {
   checkAdminSession();
 }
 
+function setAdminDashboardFeedback(type, message) {
+  const feedback = document.getElementById("adminDashboardFeedback");
+  if (!feedback) return;
+
+  feedback.innerHTML = message ? '<div class="alert alert-' + type + ' mb-0" role="alert">' + escapeHtml(message) + '</div>' : "";
+}
+
+function getAdminDashboardFilters() {
+  const doctorInput = document.getElementById("adminDoctorFilter");
+  const statusInput = document.getElementById("adminStatusFilter");
+  const dateInput = document.getElementById("adminDateFilter");
+
+  return {
+    doctor: doctorInput ? doctorInput.value.trim().toLowerCase() : "",
+    status: statusInput ? statusInput.value : "",
+    appointmentDate: dateInput ? dateInput.value : ""
+  };
+}
+
+function getAdminDashboardFilterKey() {
+  const filters = getAdminDashboardFilters();
+  return [filters.doctor, filters.status, filters.appointmentDate].join("|");
+}
+
+function setAdminAppointmentsLoading(message) {
+  const body = document.getElementById("adminAppointmentsBody");
+  if (!body) return;
+
+  body.innerHTML = "";
+  const row = document.createElement("tr");
+  const cell = document.createElement("td");
+  cell.colSpan = 8;
+  cell.className = "admin-table-state";
+  cell.textContent = message;
+  row.appendChild(cell);
+  body.appendChild(row);
+}
+
+function isFuturePendingAdminAppointment(appointment) {
+  if (!appointment || appointment.status !== "Pending" || !appointment.appointmentDate || !appointment.appointmentTime) {
+    return false;
+  }
+
+  const scheduledAt = new Date(appointment.appointmentDate + "T" + appointment.appointmentTime + ":00");
+  return !Number.isNaN(scheduledAt.getTime()) && scheduledAt.getTime() > Date.now();
+}
+
+function renderAdminAppointmentRow(appointment) {
+  const row = document.createElement("tr");
+  const values = [
+    appointment.appointmentRef,
+    appointment.patientName,
+    appointment.serviceName,
+    appointment.doctorName,
+    appointment.appointmentDate,
+    appointment.appointmentTime,
+    appointment.status
+  ];
+
+  values.forEach(function (value, index) {
+    const cell = document.createElement("td");
+    if (index === 6) {
+      const badge = document.createElement("span");
+      badge.className = "badge-status " + getStatusClass(value);
+      badge.textContent = value || "Pending";
+      cell.appendChild(badge);
+    } else {
+      cell.textContent = value || "Not set";
+    }
+    row.appendChild(cell);
+  });
+
+  const actionCell = document.createElement("td");
+  if (isFuturePendingAdminAppointment(appointment)) {
+    const approveButton = document.createElement("button");
+    approveButton.type = "button";
+    approveButton.className = "btn btn-primary btn-sm";
+    approveButton.textContent = "Approve";
+    approveButton.setAttribute("data-admin-approve-ref", appointment.appointmentRef);
+    actionCell.appendChild(approveButton);
+  } else {
+    actionCell.textContent = "Not available";
+    actionCell.className = "text-muted";
+  }
+  row.appendChild(actionCell);
+
+  return row;
+}
+
+function renderAdminAppointments(appointments, pagination) {
+  const body = document.getElementById("adminAppointmentsBody");
+  const pageSummary = document.getElementById("adminPageSummary");
+  const prevButton = document.getElementById("adminPrevPage");
+  const nextButton = document.getElementById("adminNextPage");
+  if (!body) return;
+
+  body.innerHTML = "";
+
+  if (!appointments.length) {
+    setAdminAppointmentsLoading("No appointments match the selected filters.");
+  } else {
+    appointments.forEach(function (appointment) {
+      body.appendChild(renderAdminAppointmentRow(appointment));
+    });
+  }
+
+  adminAppointmentsPage = pagination.page;
+  adminAppointmentsTotalPages = pagination.totalPages;
+
+  if (pageSummary) {
+    pageSummary.textContent = "Page " + pagination.page + " of " + pagination.totalPages + " - " + pagination.total + " appointments";
+  }
+  if (prevButton) prevButton.disabled = pagination.page <= 1;
+  if (nextButton) nextButton.disabled = pagination.page >= pagination.totalPages;
+}
+
+async function loadAdminAppointments(page) {
+  const dashboardPage = document.getElementById("adminDashboardPage");
+  if (!dashboardPage) return;
+
+  const filters = getAdminDashboardFilters();
+  const requestSequence = adminAppointmentsRequestSequence + 1;
+  adminAppointmentsRequestSequence = requestSequence;
+  const params = new URLSearchParams({ page: String(page || 1) });
+  if (filters.doctor) params.set("doctorIdentifier", filters.doctor);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.appointmentDate) params.set("appointmentDate", filters.appointmentDate);
+
+  setAdminDashboardFeedback("", "");
+  setAdminAppointmentsLoading("Loading appointments...");
+
+  try {
+    const payload = await fetchAdminApi("/admin/appointments?" + params.toString());
+    if (requestSequence !== adminAppointmentsRequestSequence) return;
+    if (!payload.data.appointments.length && payload.data.pagination.page > payload.data.pagination.totalPages) {
+      await loadAdminAppointments(payload.data.pagination.totalPages);
+      return;
+    }
+    renderAdminAppointments(payload.data.appointments, payload.data.pagination);
+  } catch (error) {
+    if (requestSequence !== adminAppointmentsRequestSequence) return;
+    if (error.status === 401) {
+      setAdminDashboardFeedback("warning", "Your admin session has expired. Redirecting to login...");
+      window.setTimeout(function () {
+        window.location.href = "admin-login.html";
+      }, 800);
+      return;
+    }
+
+    setAdminAppointmentsLoading("Unable to load appointments.");
+    setAdminDashboardFeedback(error.status === 400 ? "warning" : "danger", error.message || "Unable to load appointments.");
+  }
+}
+
+async function approveAdminAppointment(appointmentRef, button) {
+  const currentFilterKey = getAdminDashboardFilterKey();
+  const currentListSequence = adminAppointmentsRequestSequence;
+  const approvalSequence = adminApprovalRequestSequence + 1;
+  adminApprovalRequestSequence = approvalSequence;
+  const originalText = button.textContent;
+
+  button.disabled = true;
+  button.textContent = "Approving...";
+  setAdminDashboardFeedback("", "");
+
+  try {
+    const csrfToken = await getAdminCsrfToken();
+    const payload = await fetchAdminApi("/admin/appointments/" + encodeURIComponent(appointmentRef) + "/approve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken
+      },
+      body: JSON.stringify({})
+    });
+
+    if (approvalSequence !== adminApprovalRequestSequence || currentListSequence !== adminAppointmentsRequestSequence || currentFilterKey !== getAdminDashboardFilterKey()) return;
+
+    await loadAdminAppointments(adminAppointmentsPage);
+    setAdminDashboardFeedback("success", payload.message || "Appointment approved successfully.");
+  } catch (error) {
+    if (approvalSequence !== adminApprovalRequestSequence || currentListSequence !== adminAppointmentsRequestSequence || currentFilterKey !== getAdminDashboardFilterKey()) return;
+
+    if (error.status === 401) {
+      setAdminDashboardFeedback("warning", "Your admin session has expired. Redirecting to login...");
+      window.setTimeout(function () {
+        window.location.href = "admin-login.html";
+      }, 800);
+      return;
+    }
+
+    setAdminDashboardFeedback(error.status === 409 ? "warning" : "danger", error.message || "Unable to approve this appointment.");
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+function setupAdminDashboardFilters() {
+  const form = document.getElementById("adminAppointmentFilters");
+  const clearButton = document.getElementById("adminClearFilters");
+  const prevButton = document.getElementById("adminPrevPage");
+  const nextButton = document.getElementById("adminNextPage");
+
+  if (form) {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      loadAdminAppointments(1);
+    });
+  }
+
+  if (clearButton) {
+    clearButton.addEventListener("click", function () {
+      if (form) form.reset();
+      loadAdminAppointments(1);
+    });
+  }
+
+  if (prevButton) {
+    prevButton.addEventListener("click", function () {
+      if (adminAppointmentsPage > 1) loadAdminAppointments(adminAppointmentsPage - 1);
+    });
+  }
+
+  if (nextButton) {
+    nextButton.addEventListener("click", function () {
+      if (adminAppointmentsPage < adminAppointmentsTotalPages) loadAdminAppointments(adminAppointmentsPage + 1);
+    });
+  }
+
+  const tableBody = document.getElementById("adminAppointmentsBody");
+  if (tableBody) {
+    tableBody.addEventListener("click", function (event) {
+      const button = event.target.closest("[data-admin-approve-ref]");
+      if (!button || button.disabled) return;
+
+      const appointmentRef = button.getAttribute("data-admin-approve-ref");
+      if (!window.confirm("Approve this appointment?")) return;
+
+      approveAdminAppointment(appointmentRef, button);
+    });
+  }
+}
+
+async function setupAdminDashboardPage() {
+  const dashboardPage = document.getElementById("adminDashboardPage");
+  if (!dashboardPage) return;
+
+  const adminName = document.getElementById("dashboardAdminName");
+  setupAdminDashboardFilters();
+  setAdminAppointmentsLoading("Checking admin session...");
+
+  try {
+    const payload = await fetchAdminApi("/admin-auth/me");
+    if (adminName) adminName.textContent = payload.data.admin.name || "Clinic Admin";
+    await loadAdminAppointments(1);
+  } catch (error) {
+    setAdminDashboardFeedback("warning", "Please sign in to view the admin dashboard.");
+    window.setTimeout(function () {
+      window.location.href = "admin-login.html";
+    }, 800);
+  }
+}
+
 function applySavedTheme() {
   let savedTheme = "";
   try {
@@ -1629,6 +1896,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   setupDoctorFilters();
   renderDoctorsSection();
   setupAdminLoginPage();
+  setupAdminDashboardPage();
   await catalogPromise;
   populateDepartmentSelect();
   populateDoctorSelect();
