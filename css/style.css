@@ -451,6 +451,29 @@ a:hover {
     box-shadow: 0 0 0 .25rem rgba(0, 169, 157, .16)
 }
 
+.admin-auth-shell {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: var(--shadow)
+}
+
+.admin-signed-in {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 1.5rem
+}
+
+.admin-signed-in h2 {
+    margin-bottom: .25rem
+}
+
+.password-toggle-button {
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0
+}
+
 .tip-list {
     display: grid;
     gap: 1rem;
@@ -967,7 +990,9 @@ body.dark-mode .form-select:focus {
 body.dark-mode .tip-list div,
 body.dark-mode .empty-state,
 body.dark-mode .appointment-summary,
-body.dark-mode .slip-code {
+body.dark-mode .slip-code,
+body.dark-mode .admin-auth-shell,
+body.dark-mode .admin-signed-in {
     background: #101827
 }
 

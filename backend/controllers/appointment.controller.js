@@ -162,6 +162,11 @@ function generateAppointmentRef() {
   return `CC-${formatLagosDatePart()}-${randomInt(1000, 10000)}`;
 }
 
+function formatDisplayDate(dateValue) {
+  const [year, month, day] = String(dateValue || "").split("-");
+  return year && month && day ? `${day}/${month}/${year}` : "";
+}
+
 function publicAppointment(appointment, service, doctor) {
   return {
     appointmentRef: appointment.appointmentRef,
@@ -175,6 +180,7 @@ function publicAppointment(appointment, service, doctor) {
     doctorRole: doctor.role,
     doctorRoom: doctor.room,
     appointmentDate: appointment.appointmentDate,
+    appointmentDateDisplay: formatDisplayDate(appointment.appointmentDate),
     appointmentTime: appointment.appointmentTime,
     scheduledAt: appointment.scheduledAt,
     timezone: appointment.timezone,
@@ -194,6 +200,7 @@ function publicAppointmentStatus(appointment) {
     doctorRole: appointment.doctor?.role || "",
     doctorRoom: appointment.doctor?.room || "",
     appointmentDate: appointment.appointmentDate,
+    appointmentDateDisplay: formatDisplayDate(appointment.appointmentDate),
     appointmentTime: appointment.appointmentTime,
     timezone: appointment.timezone
   };

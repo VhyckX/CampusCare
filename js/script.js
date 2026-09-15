@@ -258,6 +258,10 @@ async function fetchApi(path, options) {
   return payload;
 }
 
+async function fetchAdminApi(path, options) {
+  return fetchApi(path, Object.assign({ credentials: "include" }, options || {}));
+}
+
 function mapServiceFromApi(service) {
   return {
     id: service.serviceIdentifier,
@@ -583,47 +587,165 @@ function renderAppointmentSlip(appointment) {
     '</article>';
 }
 
-function appointmentSlipHtml(appointment) {
+function pdfEscape(value) {
+  return String(value || "")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "?")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/\r?\n/g, " ");
+}
+
+function wrapPdfText(value, maxChars) {
+  const words = String(value || "Not provided").replace(/\s+/g, " ").trim().split(" ");
+  const lines = [];
+  let line = "";
+
+  words.forEach(function (word) {
+    while (word.length > maxChars) {
+      const chunk = word.slice(0, maxChars);
+      word = word.slice(maxChars);
+      if (line) {
+        lines.push(line);
+        line = "";
+      }
+      lines.push(chunk);
+    }
+
+    const nextLine = line ? line + " " + word : word;
+    if (nextLine.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = nextLine;
+    }
+  });
+
+  if (line) lines.push(line);
+  return lines.length ? lines : ["Not provided"];
+}
+
+function pdfText(x, y, size, font, color, value) {
+  return "BT 0 Tc 0 Tw 100 Tz 0 Tr /" + font + " " + size + " Tf " + color + " rg 1 0 0 1 " + x + " " + y + " Tm (" + pdfEscape(value) + ") Tj ET\n";
+}
+
+function pdfRect(x, y, width, height, color) {
+  return color + " rg " + x + " " + y + " " + width + " " + height + " re f\n";
+}
+
+function buildPdfDocument(content) {
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+    "<< /Length " + content.length + " >>\nstream\n" + content + "endstream"
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+
+  objects.forEach(function (object, index) {
+    offsets.push(pdf.length);
+    pdf += (index + 1) + " 0 obj\n" + object + "\nendobj\n";
+  });
+
+  const xrefOffset = pdf.length;
+  pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
+  offsets.slice(1).forEach(function (offset) {
+    pdf += String(offset).padStart(10, "0") + " 00000 n \n";
+  });
+  pdf += "trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF";
+
+  const bytes = new Uint8Array(pdf.length);
+  for (let index = 0; index < pdf.length; index += 1) {
+    bytes[index] = pdf.charCodeAt(index) & 0xff;
+  }
+  return bytes;
+}
+
+function appointmentSlipPdfBytes(appointment) {
   const status = getDisplayStatus(appointment);
-  const passedNote = getPassedTimeNote(appointment) ? '<p class="note">Scheduled time has passed.</p>' : '';
-  return '<!doctype html>' +
-    '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>CampusCare Appointment Slip</title>' +
-    '<style>' +
-    'body{margin:0;background:#f8fafc;color:#1f2937;font-family:Arial,sans-serif;line-height:1.6;padding:32px}' +
-    '.slip{background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 18px 40px rgba(15,23,42,.08);max-width:780px;margin:auto;overflow:hidden;padding:28px}' +
-    '.top{border-bottom:1px dashed #cbd5e1;display:flex;justify-content:space-between;gap:20px;padding-bottom:18px}' +
-    'h1{color:#0057b8;font-size:28px;margin:0 0 6px}.muted{color:#64748b;margin:0}.badge{background:rgba(0,169,157,.15);border-radius:999px;color:#007b73;font-weight:700;height:max-content;padding:8px 14px}' +
-    '.code{background:linear-gradient(135deg,rgba(0,87,184,.1),rgba(0,169,157,.12));border-radius:14px;margin:22px 0;padding:16px}.code span{color:#64748b;display:block;font-weight:700}.code strong{color:#0057b8;display:block;font-size:24px;letter-spacing:.04em}' +
-    'dl{display:grid;gap:12px 18px;grid-template-columns:190px 1fr;margin:0}dt{color:#64748b;font-weight:700}dd{font-weight:700;margin:0}.note{background:rgba(250,204,21,.16);border:1px solid rgba(250,204,21,.35);border-radius:12px;color:#854d0e;font-weight:700;margin:18px 0 0;padding:12px}.footer{border-top:1px dashed #cbd5e1;color:#64748b;margin-top:22px;padding-top:16px}' +
-    '@media(max-width:600px){body{padding:16px}.top{display:block}.badge{display:inline-block;margin-top:12px}dl{grid-template-columns:1fr}}' +
-    '</style></head><body>' +
-    '<article class="slip"><div class="top"><div><h1>CampusCare Appointment Slip</h1><p class="muted">CampusCare Student Clinic Appointment Document</p></div><span class="badge">' + status + '</span></div>' +
-    '<div class="code"><span>Appointment Number</span><strong>' + escapeHtml(appointment.id) + '</strong></div>' +
-    '<dl>' +
-    '<dt>Full Name</dt><dd>' + escapeHtml(appointment.fullName) + '</dd>' +
-    '<dt>Email</dt><dd>' + escapeHtml(appointment.email) + '</dd>' +
-    '<dt>Phone Number</dt><dd>' + escapeHtml(appointment.phone) + '</dd>' +
-    '<dt>Service</dt><dd>' + escapeHtml(appointment.service) + '</dd>' +
-    '<dt>Doctor</dt><dd>' + escapeHtml(appointment.doctor) + ' - ' + escapeHtml(appointment.doctorRole) + '</dd>' +
-    '<dt>Date</dt><dd>' + formatDate(appointment.appointmentDate) + '</dd>' +
-    '<dt>Time</dt><dd>' + formatTime(appointment.appointmentTime) + '</dd>' +
-    '<dt>Status</dt><dd>' + status + '</dd>' +
-    '</dl>' + passedNote + '<p class="footer">CampusCare Student Clinic | Main Campus Clinic Desk | Generated locally in your browser.</p></article>' +
-    '</body></html>';
+  const generatedAt = new Date().toLocaleString("en-NG", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+  const fields = [
+    ["Full Name", appointment.fullName],
+    ["Email", appointment.email],
+    ["Phone Number", appointment.phone],
+    ["Service", appointment.service],
+    ["Doctor", appointment.doctor + (appointment.doctorRole ? " - " + appointment.doctorRole : "")],
+    ["Clinic Room", appointment.doctorRoom || "Not set"],
+    ["Date", formatDate(appointment.appointmentDate)],
+    ["Time", formatTime(appointment.appointmentTime)],
+    ["Status When Generated", status],
+    ["Reason for Visit", appointment.reason || "Not provided"]
+  ];
+  let content = "";
+  let y = 792;
+
+  content += pdfRect(0, 778, 595.28, 64, "0 0.341 0.722");
+  content += pdfRect(0, 764, 595.28, 14, "0 0.663 0.616");
+  content += pdfText(42, 808, 21, "F2", "1 1 1", "CampusCare Appointment Slip");
+  content += pdfText(42, 790, 9.5, "F1", "0.88 0.95 1", "CampusCare Student Clinic - Main Campus Clinic Desk");
+  content += pdfRect(431, 794, 104, 24, "1 1 1");
+  content += pdfText(449, 801, 10, "F2", "0 0.341 0.722", status);
+
+  y = 724;
+  content += pdfText(42, y, 8, "F2", "0.392 0.455 0.545", "APPOINTMENT REFERENCE");
+  content += pdfText(42, y - 27, 24, "F2", "0 0.341 0.722", appointment.id);
+  content += pdfRect(42, y - 41, 511, 2, "0 0.663 0.616");
+
+  y -= 72;
+  fields.forEach(function (field) {
+    const label = field[0];
+    const value = field[1];
+    const lines = wrapPdfText(value, label === "Reason for Visit" ? 76 : 64);
+    const rowHeight = Math.max(28, lines.length * 12 + 12);
+
+    content += pdfRect(42, y - rowHeight + 5, 511, rowHeight, "0.969 0.98 0.992");
+    content += pdfText(56, y - 9, 8, "F2", "0.392 0.455 0.545", label.toUpperCase());
+    lines.forEach(function (line, lineIndex) {
+      content += pdfText(190, y - 9 - lineIndex * 12, 9, "F1", "0.122 0.161 0.216", line);
+    });
+    y -= rowHeight + 7;
+  });
+
+  const noteLines = wrapPdfText("Status shown is the status when this slip was generated. Visit the Status page with your appointment reference and booking email for the latest update.", 89);
+  content += pdfRect(42, y - 48, 511, 44, "0.918 0.976 0.969");
+  noteLines.forEach(function (line, index) {
+    content += pdfText(56, y - 18 - index * 11, 8.8, "F1", "0 0.341 0.322", line);
+  });
+
+  content += pdfText(42, 42, 8, "F1", "0.392 0.455 0.545", "Generated locally in this browser on " + generatedAt + ".");
+  content += pdfText(42, 28, 8, "F1", "0.392 0.455 0.545", "No patient data was sent to an external PDF conversion service.");
+
+  return buildPdfDocument(content);
 }
 
 function downloadAppointmentSlip(appointment) {
-  const slip = appointment || latestAppointmentSlip;
-  if (!slip) return;
-  const blob = new Blob([appointmentSlipHtml(slip)], { type: "text/html" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = slip.id + "-appointment-slip.html";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(link.href);
+  try {
+    const slip = appointment || latestAppointmentSlip;
+    if (!slip) return;
+    const blob = new Blob([appointmentSlipPdfBytes(slip)], { type: "application/pdf" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = slip.id + "-appointment-slip.pdf";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+  } catch (error) {
+    const slipArea = document.getElementById("appointmentSlipArea");
+    if (slipArea) {
+      const errorBox = document.createElement("div");
+      errorBox.className = "alert alert-danger mt-3";
+      errorBox.setAttribute("role", "alert");
+      errorBox.textContent = "CampusCare could not generate the PDF slip. Please try again.";
+      slipArea.appendChild(errorBox);
+    }
+  }
 }
 
 function copyAppointmentId(appointmentId) {
@@ -767,7 +889,7 @@ function setupAppointmentForm() {
       form.classList.remove("was-validated");
       populateDepartmentSelect();
       populateDoctorSelect();
-      showAlert(alertBox, "success", "<strong>&#10003; Appointment booked successfully!</strong><br>Your Appointment ID: <strong>" + appointment.id + "</strong><br>Please save this ID. Backend status lookup will be connected in the next task.");
+      showAlert(alertBox, "success", "<strong>&#10003; Appointment booked successfully!</strong><br>Your Appointment ID: <strong>" + appointment.id + "</strong><br>Please save this ID and your booking email for the Status page.");
 
       if (slipArea) {
         slipArea.innerHTML = renderAppointmentSlip(appointment);
@@ -1292,6 +1414,164 @@ function setupDoctorFilters() {
   }
 }
 
+function setAdminFeedback(type, message) {
+  const feedback = document.getElementById("adminAuthFeedback");
+  if (!feedback) return;
+
+  feedback.innerHTML = message ? '<div class="alert alert-' + type + ' mb-0" role="alert">' + escapeHtml(message) + '</div>' : "";
+}
+
+function setAdminLoading(isLoading, text) {
+  const loginButton = document.getElementById("adminLoginButton");
+  const logoutButton = document.getElementById("adminLogoutButton");
+
+  if (loginButton) {
+    loginButton.disabled = isLoading;
+    loginButton.textContent = isLoading ? (text || "Please wait...") : "Login";
+  }
+
+  if (logoutButton) {
+    logoutButton.disabled = isLoading;
+  }
+}
+
+function renderAdminSignedOut() {
+  const authForm = document.getElementById("adminLoginForm");
+  const signedInPanel = document.getElementById("adminSignedInPanel");
+
+  if (authForm) authForm.classList.remove("d-none");
+  if (signedInPanel) signedInPanel.classList.add("d-none");
+}
+
+function renderAdminSignedIn(admin) {
+  const authForm = document.getElementById("adminLoginForm");
+  const signedInPanel = document.getElementById("adminSignedInPanel");
+  const adminName = document.getElementById("adminSignedInName");
+  const adminEmail = document.getElementById("adminSignedInEmail");
+
+  if (authForm) authForm.classList.add("d-none");
+  if (signedInPanel) signedInPanel.classList.remove("d-none");
+  if (adminName) adminName.textContent = admin && admin.name ? admin.name : "Clinic Admin";
+  if (adminEmail) adminEmail.textContent = admin && admin.email ? admin.email : "";
+}
+
+async function checkAdminSession() {
+  const adminPage = document.getElementById("adminLoginPage");
+  if (!adminPage) return;
+
+  setAdminFeedback("info", "Checking admin session...");
+
+  try {
+    const payload = await fetchAdminApi("/admin-auth/me");
+    renderAdminSignedIn(payload.data.admin);
+    setAdminFeedback("", "");
+  } catch (error) {
+    renderAdminSignedOut();
+    if (error.status === 401) {
+      setAdminFeedback("", "");
+    } else {
+      setAdminFeedback("warning", error.message || "Could not check the admin session.");
+    }
+  }
+}
+
+async function getAdminCsrfToken() {
+  const payload = await fetchAdminApi("/admin-auth/csrf-token");
+  return payload.data.csrfToken;
+}
+
+function setupPasswordVisibilityToggle() {
+  const toggle = document.getElementById("adminPasswordToggle");
+  const passwordInput = document.getElementById("adminPassword");
+  if (!toggle || !passwordInput) return;
+
+  toggle.addEventListener("click", function () {
+    const shouldShow = passwordInput.type === "password";
+    passwordInput.type = shouldShow ? "text" : "password";
+    toggle.textContent = shouldShow ? "Hide" : "Show";
+    toggle.setAttribute("aria-label", shouldShow ? "Hide password" : "Show password");
+  });
+}
+
+function setupAdminLoginForm() {
+  const form = document.getElementById("adminLoginForm");
+  if (!form) return;
+
+  form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const emailInput = document.getElementById("adminEmail");
+    const passwordInput = document.getElementById("adminPassword");
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+    const password = passwordInput ? passwordInput.value : "";
+
+    form.classList.add("was-validated");
+    if (!email || !password || !form.checkValidity()) {
+      setAdminFeedback("danger", "Enter the admin email and password.");
+      return;
+    }
+
+    setAdminLoading(true, "Logging in...");
+    setAdminFeedback("", "");
+
+    try {
+      const payload = await fetchAdminApi("/admin-auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, password: password })
+      });
+
+      passwordInput.value = "";
+      form.classList.remove("was-validated");
+      renderAdminSignedIn(payload.data.admin);
+      setAdminFeedback("success", "Signed in successfully.");
+    } catch (error) {
+      setAdminFeedback(error.status === 429 ? "warning" : "danger", error.message || "Unable to sign in right now.");
+    } finally {
+      setAdminLoading(false);
+    }
+  });
+}
+
+function setupAdminLogout() {
+  const logoutButton = document.getElementById("adminLogoutButton");
+  if (!logoutButton) return;
+
+  logoutButton.addEventListener("click", async function () {
+    setAdminLoading(true, "Please wait...");
+    setAdminFeedback("", "");
+
+    try {
+      const csrfToken = await getAdminCsrfToken();
+      await fetchAdminApi("/admin-auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify({})
+      });
+      renderAdminSignedOut();
+      setAdminFeedback("success", "Signed out successfully.");
+    } catch (error) {
+      setAdminFeedback("danger", error.message || "Unable to sign out right now.");
+    } finally {
+      setAdminLoading(false);
+    }
+  });
+}
+
+function setupAdminLoginPage() {
+  const adminPage = document.getElementById("adminLoginPage");
+  if (!adminPage) return;
+
+  setupPasswordVisibilityToggle();
+  setupAdminLoginForm();
+  setupAdminLogout();
+  checkAdminSession();
+}
+
 function applySavedTheme() {
   let savedTheme = "";
   try {
@@ -1346,6 +1626,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   renderServiceDoctors();
   setupDoctorFilters();
   renderDoctorsSection();
+  setupAdminLoginPage();
   await catalogPromise;
   populateDepartmentSelect();
   populateDoctorSelect();

@@ -1,14 +1,7 @@
-import dotenv from "dotenv";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import app from "./app.js";
+import "./config/env.js";
+import app, { configureSessionMiddleware } from "./app.js";
 import { connectDatabase, disconnectDatabase } from "./config/db.js";
 import { configureDnsServers } from "./config/dns.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-dotenv.config({ path: resolve(__dirname, ".env") });
 
 const PORT = process.env.PORT || 5000;
 const DB_NAME = process.env.MONGODB_DB_NAME || "campuscare";
@@ -19,6 +12,7 @@ async function startServer() {
   try {
     configureDnsServers();
     await connectDatabase({ dbName: DB_NAME });
+    configureSessionMiddleware();
 
     server = app.listen(PORT, () => {
       console.log(`CampusCare API server running on port ${PORT}`);

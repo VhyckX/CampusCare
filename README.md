@@ -7,7 +7,7 @@ CampusCare is a student clinic appointment project built for a SIWES presentatio
 - `index.html` - Home page with hero section, statistics, service preview, how it works, and contact section.
 - `services.html` - Clinic service cards, opening hours, doctor cards, doctor search, and availability filters.
 - `appointment.html` - Appointment booking form with validation, doctor selection, local history filters, generated appointment ID, cancellation, cancelled appointment deletion, and appointment slip download.
-- `status.html` - Appointment status tracking using the generated appointment ID saved in the browser.
+- `status.html` - Backend appointment lookup and guest cancellation using appointment reference plus booking email, with older browser-saved demo records labelled separately.
 
 ## Technologies Used
 
@@ -18,6 +18,7 @@ CampusCare is a student clinic appointment project built for a SIWES presentatio
 - Bootstrap 5 local files from `css/bootstrap.min.css` and `js/bootstrap.min.js`
 - Vanilla JavaScript in `js/script.js`
 - Browser `localStorage` for appointment records and theme preference
+- Browser-generated PDF appointment slips using vanilla JavaScript, with no external PDF conversion service
 
 ### Backend
 
@@ -83,7 +84,7 @@ cd backend
 npm start
 ```
 
-The backend reads `PORT`, `MONGODB_URI`, optional `MONGODB_DB_NAME`, optional `DNS_SERVERS`, and optional `CORS_ORIGINS` from `backend/.env`. `PORT` defaults to `5000`, and MongoDB uses the database name `campuscare` unless `MONGODB_DB_NAME` is set.
+The backend reads `PORT`, `MONGODB_URI`, optional `MONGODB_DB_NAME`, optional `DNS_SERVERS`, optional `CORS_ORIGINS`, and admin-session settings from `backend/.env`. `PORT` defaults to `5000`, and MongoDB uses the database name `campuscare` unless `MONGODB_DB_NAME` is set.
 
 Check the health endpoint in a second terminal:
 
@@ -160,6 +161,7 @@ Successful response:
     "doctorRole": "General Practitioner",
     "doctorRoom": "Room 1",
     "appointmentDate": "2026-10-15",
+    "appointmentDateDisplay": "15/10/2026",
     "appointmentTime": "09:00",
     "scheduledAt": "2026-10-15T08:00:00.000Z",
     "timezone": "Africa/Lagos",
@@ -173,7 +175,11 @@ Successful response:
 
 The client must send Lagos clinic date/time as `appointmentDate` (`YYYY-MM-DD`) and `appointmentTime` (`HH:mm`, 24-hour format). The server derives `scheduledAt`, generates the appointment reference, and always starts the appointment as `Pending`.
 
+Backend responses preserve `appointmentDate` as `YYYY-MM-DD` for compatibility and also include `appointmentDateDisplay` in `DD/MM/YYYY` format for user-facing displays.
+
 Slot protection is handled by a MongoDB unique partial index on doctor and scheduled time for active appointment statuses. This blocks simultaneous bookings for the same doctor and slot while still allowing a cancelled slot to be booked again later. The booking endpoint also converts duplicate-key conflicts into a `409` response.
+
+Appointment slips are generated as dedicated A4 portrait PDFs directly in the browser. The PDF uses CampusCare colors and includes the booking details, server-issued appointment reference, and the status at the time the slip was generated. Students should use the Status page for the latest appointment status. No PDF library or external conversion service is currently required.
 
 ## Appointment Lookup API
 
@@ -201,6 +207,7 @@ Successful response:
     "doctorRole": "General Practitioner",
     "doctorRoom": "Room 1",
     "appointmentDate": "2026-10-15",
+    "appointmentDateDisplay": "15/10/2026",
     "appointmentTime": "09:00",
     "timezone": "Africa/Lagos"
   }
@@ -236,6 +243,7 @@ Successful response:
     "doctorRole": "General Practitioner",
     "doctorRoom": "Room 1",
     "appointmentDate": "2026-10-15",
+    "appointmentDateDisplay": "15/10/2026",
     "appointmentTime": "09:00",
     "timezone": "Africa/Lagos"
   }
@@ -245,6 +253,41 @@ Successful response:
 Cancellation is allowed only for future `Pending` or `Confirmed` appointments. Already-cancelled appointments return a successful `Cancelled` response so repeated clicks are safe. Completed appointments and past active appointments return `409`. Unknown references and mismatched booking emails return the same generic `404`. Responses use `Cache-Control: no-store`, return only the same limited public fields as lookup, and attempts are rate-limited in memory.
 
 The cancellation update is atomic: MongoDB only changes the status when the same record still matches the reference, booking email, future scheduled time, and cancellable status. The existing partial unique slot index only protects `Pending` and `Confirmed` appointments, so setting a record to `Cancelled` releases that doctor/time slot for reuse.
+
+## Clinic Admin Authentication API
+
+Clinic admin authentication is backend-only at this stage. There is no public registration page and no doctor-specific login. A single private clinic-admin account is created from the terminal for the site owner; it is not linked to one doctor because admin access will later cover all doctors' appointments and availability.
+
+Required and optional environment variables:
+
+```text
+SESSION_SECRET=use_at_least_32_random_characters
+SESSION_TTL_MINUTES=120
+SESSION_COOKIE_NAME=campuscare.sid
+SESSION_COOKIE_SAMESITE=lax
+SESSION_COOKIE_SECURE=false
+SESSION_COLLECTION_NAME=admin_sessions
+```
+
+Use a strong `SESSION_SECRET` before deployment. In production, cookies are sent as `HttpOnly` and `Secure`; `SESSION_COOKIE_SAMESITE` should normally stay `lax` unless a deployed frontend requires a different cookie policy.
+
+Create the private clinic-admin account from the terminal:
+
+```powershell
+cd backend
+npm run admin:create -- --name "Clinic Admin" --email admin@example.com
+```
+
+The command loads `backend/.env`, applies optional `DNS_SERVERS`, connects to MongoDB, asks for the password with a hidden prompt, hashes the password with `bcrypt`, and stores only the password hash. It never prints the password.
+
+Admin auth endpoints:
+
+- `POST /api/admin-auth/login` - accepts `{ "email": "...", "password": "..." }`, uses bounded rate limiting, returns a generic invalid-credentials error, and creates a MongoDB-backed server-side session.
+- `GET /api/admin-auth/me` - returns the currently authenticated clinic admin from the server-side session.
+- `GET /api/admin-auth/csrf-token` - returns a CSRF token tied to the current session.
+- `POST /api/admin-auth/logout` - requires a valid session and `X-CSRF-Token`, then destroys the session.
+
+Admin identity is always read from the server-side session. Future admin-only routes must not trust a doctor or admin ID sent by the client.
 
 ### Latest Lookup Test Results
 
@@ -311,12 +354,18 @@ Only use this as a local troubleshooting setting. A DNS server address provided 
 - `backend/server.js` - Loads `backend/.env`, applies optional DNS settings, connects to MongoDB, reads `PORT` and optional `MONGODB_DB_NAME`, starts the server, and handles shutdown.
 - `backend/config/db.js` - Connects to MongoDB Atlas using Mongoose and closes the database connection during shutdown.
 - `backend/config/dns.js` - Reads optional comma-separated DNS server IP addresses and applies them before the database connection.
+- `backend/config/env.js` - Loads `backend/.env` consistently for the server, scripts, and tests.
+- `backend/config/session.js` - Configures MongoDB-backed admin sessions and secure cookie behavior.
 - `backend/models/service.model.js` - Defines clinic services using a stable service identifier, display name, and structured opening-days/hours rules.
 - `backend/models/doctor.model.js` - Defines doctors with a stable doctor identifier, role, room, availability flag, and service reference.
+- `backend/models/clinicAdmin.model.js` - Defines the private clinic-admin login account and stores a password hash only.
 - `backend/models/appointment.model.js` - Defines appointment records with a unique appointment reference, patient contact details, service/doctor references, Lagos clinic date/time, status, and timestamps.
 - `backend/seed/catalog.seed.js` - Prepares the demo service/doctor catalog seed command without creating appointments or users.
+- `backend/scripts/create-admin-account.js` - Creates the private clinic-admin account from the terminal with a hidden password prompt.
+- `backend/middleware/adminAuth.js` - Reads authenticated admin identity from the session and validates CSRF tokens for authenticated mutations.
 - `backend/routes/catalog.routes.js` and `backend/controllers/catalog.controller.js` - Provide read-only services/doctors catalog APIs.
 - `backend/routes/appointment.routes.js` and `backend/controllers/appointment.controller.js` - Create bookings, look up appointment status, and cancel eligible guest appointments through the backend API.
+- `backend/routes/adminAuth.routes.js` and `backend/controllers/adminAuth.controller.js` - Provide admin login, logout, current-admin, and CSRF-token endpoints.
 - `backend/routes/health.routes.js` - Defines the `/api/health` route.
 - `backend/controllers/health.controller.js` - Sends the health-check JSON response.
 - `backend/.env.example` - Shows the required environment variable format.
@@ -331,4 +380,4 @@ CampusCare appointment forms use the Nigerian clinic's local calendar date and t
 
 Appointment status is stored separately and must not be changed automatically just because `scheduledAt` is in the past.
 
-No login system, CDN Bootstrap, frontend framework, staff status updates, dashboard backend, or PDF slip generation is included yet.
+No public doctor registration, student authentication, frontend framework, staff appointment-management dashboard, or external PDF conversion service is included yet.

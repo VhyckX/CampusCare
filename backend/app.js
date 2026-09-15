@@ -1,9 +1,22 @@
 import express from "express";
+import "./config/env.js";
+import adminAuthRoutes from "./routes/adminAuth.routes.js";
 import appointmentRoutes from "./routes/appointment.routes.js";
 import catalogRoutes from "./routes/catalog.routes.js";
 import healthRoutes from "./routes/health.routes.js";
+import { configureDnsServers } from "./config/dns.js";
+import { createSessionMiddleware } from "./config/session.js";
+
+configureDnsServers();
 
 const app = express();
+let sessionMiddleware;
+
+export function configureSessionMiddleware() {
+  sessionMiddleware = createSessionMiddleware();
+}
+
+app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : 0);
 
 app.use((req, res, next) => {
   const allowedOrigins = String(process.env.CORS_ORIGINS || "")
@@ -16,7 +29,8 @@ app.use((req, res, next) => {
     res.set("Access-Control-Allow-Origin", requestOrigin);
     res.set("Vary", "Origin");
     res.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type,X-CSRF-Token");
+    res.set("Access-Control-Allow-Credentials", "true");
   }
 
   if (req.method === "OPTIONS") {
@@ -27,10 +41,18 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: "100kb" }));
+app.use((req, res, next) => {
+  if (!sessionMiddleware) {
+    return next(new Error("Session middleware is not configured."));
+  }
+
+  return sessionMiddleware(req, res, next);
+});
 
 app.use("/api/health", healthRoutes);
 app.use("/api", catalogRoutes);
 app.use("/api/appointments", appointmentRoutes);
+app.use("/api/admin-auth", adminAuthRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

@@ -28,6 +28,7 @@ temp/
 # Build/output folders, if ever generated
 dist/
 build/
+output/pdf/*.pdf
 
 # Dependency folders, if accidentally created
 node_modules/
