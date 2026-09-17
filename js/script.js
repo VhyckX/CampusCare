@@ -14,6 +14,7 @@ let adminAppointmentsPage = 1;
 let adminAppointmentsTotalPages = 1;
 let adminAppointmentsRequestSequence = 0;
 let adminApprovalRequestSequence = 0;
+let adminDoctorAvailabilityRequestSequence = 0;
 
 const fallbackClinicServices = [
   {
@@ -1461,6 +1462,27 @@ function renderAdminSignedIn(admin) {
   if (adminEmail) adminEmail.textContent = admin && admin.email ? admin.email : "";
 }
 
+function renderAdminNavigation(isSignedIn) {
+  document.querySelectorAll("[data-admin-nav-link]").forEach(function (link) {
+    link.textContent = isSignedIn ? "Dashboard" : "Admin Login";
+    link.href = isSignedIn ? "admin-dashboard.html" : "admin-login.html";
+  });
+}
+
+async function setupAdminNavigation() {
+  const adminLinks = document.querySelectorAll("[data-admin-nav-link]");
+  if (!adminLinks.length) return;
+
+  renderAdminNavigation(false);
+
+  try {
+    await fetchAdminApi("/admin-auth/me");
+    renderAdminNavigation(true);
+  } catch (error) {
+    renderAdminNavigation(false);
+  }
+}
+
 async function checkAdminSession() {
   const adminPage = document.getElementById("adminLoginPage");
   if (!adminPage) return;
@@ -1585,6 +1607,13 @@ function setAdminDashboardFeedback(type, message) {
   feedback.innerHTML = message ? '<div class="alert alert-' + type + ' mb-0" role="alert">' + escapeHtml(message) + '</div>' : "";
 }
 
+function setAdminDoctorFeedback(type, message) {
+  const feedback = document.getElementById("adminDoctorFeedback");
+  if (!feedback) return;
+
+  feedback.innerHTML = message ? '<div class="alert alert-' + type + ' mb-3" role="alert">' + escapeHtml(message) + '</div>' : "";
+}
+
 function getAdminDashboardFilters() {
   const doctorInput = document.getElementById("adminDoctorFilter");
   const statusInput = document.getElementById("adminStatusFilter");
@@ -1600,6 +1629,140 @@ function getAdminDashboardFilters() {
 function getAdminDashboardFilterKey() {
   const filters = getAdminDashboardFilters();
   return [filters.doctor, filters.status, filters.appointmentDate].join("|");
+}
+
+function setAdminDoctorsLoading(message) {
+  const list = document.getElementById("adminDoctorsList");
+  if (!list) return;
+
+  list.innerHTML = "";
+  const state = document.createElement("div");
+  state.className = "admin-table-state";
+  state.textContent = message;
+  list.appendChild(state);
+}
+
+function renderAdminDoctorRow(doctor) {
+  const row = document.createElement("div");
+  row.className = "admin-doctor-row";
+  row.setAttribute("data-admin-doctor-row", doctor.doctorIdentifier);
+
+  const identity = document.createElement("div");
+  const name = document.createElement("h4");
+  const role = document.createElement("p");
+  name.textContent = doctor.name || "Unnamed doctor";
+  role.textContent = doctor.role || "Clinic doctor";
+  identity.appendChild(name);
+  identity.appendChild(role);
+
+  const service = document.createElement("div");
+  const serviceLabel = document.createElement("p");
+  serviceLabel.textContent = doctor.service?.name || doctor.serviceName || doctor.serviceIdentifier || "Unassigned service";
+  service.appendChild(serviceLabel);
+
+  const actions = document.createElement("div");
+  actions.className = "admin-availability-actions";
+  const badge = document.createElement("span");
+  badge.className = "badge-status " + (doctor.available ? "status-confirmed" : "status-cancelled");
+  badge.textContent = doctor.available ? "Available" : "Unavailable";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = doctor.available ? "btn btn-outline-primary btn-sm" : "btn btn-primary btn-sm";
+  button.textContent = doctor.available ? "Set unavailable" : "Set available";
+  button.setAttribute("data-admin-doctor-toggle", doctor.doctorIdentifier);
+  button.setAttribute("data-next-available", doctor.available ? "false" : "true");
+  actions.appendChild(badge);
+  actions.appendChild(button);
+
+  row.appendChild(identity);
+  row.appendChild(service);
+  row.appendChild(actions);
+  return row;
+}
+
+function renderAdminDoctors(doctors) {
+  const list = document.getElementById("adminDoctorsList");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (!doctors.length) {
+    setAdminDoctorsLoading("No doctors are available in the catalog.");
+    return;
+  }
+
+  doctors.forEach(function (doctor) {
+    list.appendChild(renderAdminDoctorRow(doctor));
+  });
+}
+
+function replaceAdminDoctorRow(doctor) {
+  const list = document.getElementById("adminDoctorsList");
+  if (!list || !doctor || !doctor.doctorIdentifier) return;
+
+  const rows = list.querySelectorAll("[data-admin-doctor-row]");
+  rows.forEach(function (row) {
+    if (row.getAttribute("data-admin-doctor-row") === doctor.doctorIdentifier) {
+      row.replaceWith(renderAdminDoctorRow(doctor));
+    }
+  });
+}
+
+async function loadAdminDoctors() {
+  const dashboardPage = document.getElementById("adminDashboardPage");
+  if (!dashboardPage) return;
+
+  setAdminDoctorFeedback("", "");
+  setAdminDoctorsLoading("Loading doctors...");
+
+  try {
+    const payload = await fetchApi("/doctors");
+    renderAdminDoctors(payload.data || []);
+  } catch (error) {
+    setAdminDoctorsLoading("Unable to load doctors.");
+    setAdminDoctorFeedback("danger", error.message || "Unable to load doctor availability.");
+  }
+}
+
+async function saveAdminDoctorAvailability(doctorIdentifier, nextAvailable, button) {
+  const requestSequence = adminDoctorAvailabilityRequestSequence + 1;
+  adminDoctorAvailabilityRequestSequence = requestSequence;
+  const originalText = button.textContent;
+
+  button.disabled = true;
+  button.textContent = "Saving...";
+  setAdminDoctorFeedback("", "");
+
+  try {
+    const csrfToken = await getAdminCsrfToken();
+    const payload = await fetchAdminApi("/admin/doctors/" + encodeURIComponent(doctorIdentifier) + "/availability", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken
+      },
+      body: JSON.stringify({ available: nextAvailable })
+    });
+
+    if (requestSequence !== adminDoctorAvailabilityRequestSequence) return;
+
+    replaceAdminDoctorRow(payload.data);
+    setAdminDoctorFeedback("success", payload.message || "Doctor availability updated.");
+  } catch (error) {
+    if (requestSequence !== adminDoctorAvailabilityRequestSequence) return;
+
+    if (error.status === 401) {
+      setAdminDoctorFeedback("warning", "Your admin session has expired. Redirecting to login...");
+      window.setTimeout(function () {
+        window.location.href = "admin-login.html";
+      }, 800);
+      return;
+    }
+
+    setAdminDoctorFeedback(error.status === 404 || error.status === 400 ? "warning" : "danger", error.message || "Unable to update doctor availability.");
+    button.disabled = false;
+    button.textContent = originalText;
+  }
 }
 
 function setAdminAppointmentsLoading(message) {
@@ -1819,6 +1982,18 @@ function setupAdminDashboardFilters() {
       approveAdminAppointment(appointmentRef, button);
     });
   }
+
+  const doctorsList = document.getElementById("adminDoctorsList");
+  if (doctorsList) {
+    doctorsList.addEventListener("click", function (event) {
+      const button = event.target.closest("[data-admin-doctor-toggle]");
+      if (!button || button.disabled) return;
+
+      const doctorIdentifier = button.getAttribute("data-admin-doctor-toggle");
+      const nextAvailable = button.getAttribute("data-next-available") === "true";
+      saveAdminDoctorAvailability(doctorIdentifier, nextAvailable, button);
+    });
+  }
 }
 
 async function setupAdminDashboardPage() {
@@ -1832,6 +2007,7 @@ async function setupAdminDashboardPage() {
   try {
     const payload = await fetchAdminApi("/admin-auth/me");
     if (adminName) adminName.textContent = payload.data.admin.name || "Clinic Admin";
+    await loadAdminDoctors();
     await loadAdminAppointments(1);
   } catch (error) {
     setAdminDashboardFeedback("warning", "Please sign in to view the admin dashboard.");
@@ -1895,6 +2071,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   renderServiceDoctors();
   setupDoctorFilters();
   renderDoctorsSection();
+  setupAdminNavigation();
   setupAdminLoginPage();
   setupAdminDashboardPage();
   await catalogPromise;

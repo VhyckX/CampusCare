@@ -331,6 +331,14 @@ Admin auth endpoints:
 
 Admin identity is always read from the server-side session. Future admin-only routes must not trust a doctor or admin ID sent by the client.
 
+### Admin Navigation and Doctor Availability
+
+Public-page navigation includes a same-tab Admin Login link. A successful admin session check changes it to Dashboard; a missing session or failed check leaves Admin Login usable without blocking public pages.
+
+The dashboard lists doctors, services and current availability. Its controls use `POST /api/admin/doctors/:doctorIdentifier/availability` with a strict boolean `available` value, an authenticated admin session and a CSRF token. The displayed state changes only after saving succeeds. Availability affects new bookings only; existing appointments remain unchanged. Fresh public catalog requests reflect saved availability, and booking validation rejects unavailable doctors.
+
+The successful manual availability check was reported by the site owner. Focused mocked checks also passed for protected access, CSRF, input validation, updates and failed-save feedback; these checks were not repeated for this checkpoint.
+
 ### Latest Lookup Test Results
 
 The lookup flow was tested with fictional fixtures in `campuscare_test` on separate local test ports:
@@ -408,7 +416,7 @@ Only use this as a local troubleshooting setting. A DNS server address provided 
 - `backend/routes/catalog.routes.js` and `backend/controllers/catalog.controller.js` - Provide read-only services/doctors catalog APIs.
 - `backend/routes/appointment.routes.js` and `backend/controllers/appointment.controller.js` - Create bookings, look up appointment status, and cancel eligible guest appointments through the backend API.
 - `backend/routes/adminAuth.routes.js` and `backend/controllers/adminAuth.controller.js` - Provide admin login, logout, current-admin, and CSRF-token endpoints.
-- `backend/routes/admin.routes.js` and `backend/controllers/adminAppointment.controller.js` - Provide the protected clinic-admin appointment list and approval endpoint.
+- `backend/routes/admin.routes.js` and `backend/controllers/adminAppointment.controller.js` - Provide the protected clinic-admin appointment list, approval and doctor availability endpoints.
 - `backend/routes/health.routes.js` - Defines the `/api/health` route.
 - `backend/controllers/health.controller.js` - Sends the health-check JSON response.
 - `backend/.env.example` - Shows the required environment variable format.
@@ -423,4 +431,4 @@ CampusCare appointment forms use the Nigerian clinic's local calendar date and t
 
 Appointment status is stored separately and must not be changed automatically just because `scheduledAt` is in the past.
 
-No public doctor registration, student authentication, frontend framework, broad staff dashboard, or external PDF conversion service is included yet. The current clinic-admin dashboard is limited to protected appointment viewing, filtering, pagination, and approval of eligible future pending appointments.
+No public doctor registration, student authentication, frontend framework, broad staff dashboard, or external PDF conversion service is included yet. The current clinic-admin dashboard supports protected appointment viewing, filtering, pagination, approval of eligible future pending appointments, and doctor availability controls for new bookings.

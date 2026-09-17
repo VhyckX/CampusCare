@@ -503,6 +503,64 @@ a:hover {
     gap: .75rem
 }
 
+.admin-availability-panel {
+    border-top: 1px solid var(--border);
+    margin-top: 1.5rem;
+    padding-top: 1.5rem
+}
+
+.admin-section-heading {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between
+}
+
+.admin-section-heading h3 {
+    font-size: 1.2rem;
+    margin-bottom: .25rem
+}
+
+.admin-section-heading p {
+    color: var(--muted);
+    margin-bottom: 0;
+    max-width: 460px
+}
+
+.admin-doctor-list {
+    display: grid;
+    gap: .75rem;
+    margin-top: 1rem
+}
+
+.admin-doctor-row {
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+    padding: 1rem
+}
+
+.admin-doctor-row h4 {
+    font-size: 1rem;
+    margin-bottom: .25rem
+}
+
+.admin-doctor-row p {
+    color: var(--muted);
+    margin-bottom: 0
+}
+
+.admin-availability-actions {
+    align-items: center;
+    display: flex;
+    gap: .75rem;
+    justify-content: flex-end
+}
+
 .admin-table-wrap {
     overflow-x: auto
 }
@@ -1092,10 +1150,19 @@ body.dark-mode .site-footer {
     }
 
     .admin-dashboard-header,
+    .admin-section-heading,
     .admin-pagination,
     .admin-filter-actions {
         align-items: stretch;
         flex-direction: column
+    }
+
+    .admin-doctor-row {
+        grid-template-columns: 1fr
+    }
+
+    .admin-availability-actions {
+        justify-content: flex-start
     }
 }
 
@@ -1444,6 +1511,7 @@ body.dark-mode .clinic-doctor-card {
 body.dark-mode .history-card,
 body.dark-mode .tracking-details,
 body.dark-mode .doctor-row,
+body.dark-mode .admin-doctor-row,
 body.dark-mode .admin-appointments-table {
     background: #101827
 }

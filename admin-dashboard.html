@@ -26,7 +26,7 @@
                     <li class="nav-item"><a class="nav-link" href="services.html">Services</a></li>
                     <li class="nav-item"><a class="nav-link" href="appointment.html">Appointment</a></li>
                     <li class="nav-item"><a class="nav-link" href="status.html">Status</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="admin-dashboard.html">Admin</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="admin-dashboard.html" data-admin-nav-link>Dashboard</a></li>
                     <li class="nav-item ms-lg-3"><button class="theme-toggle" type="button" id="themeToggle"
                             aria-label="Switch to dark mode" title="Switch theme"><span
                                 class="theme-icon">&#127769;</span></button></li>
@@ -51,6 +51,20 @@
                         </div>
                         <a class="btn btn-outline-primary" href="admin-login.html">Account</a>
                     </div>
+
+                    <section class="admin-availability-panel" aria-labelledby="adminAvailabilityTitle">
+                        <div class="admin-section-heading">
+                            <div>
+                                <span class="section-kicker">Doctor availability</span>
+                                <h3 id="adminAvailabilityTitle">New booking controls</h3>
+                            </div>
+                            <p>Availability controls whether a doctor can receive new bookings. Existing appointments are not changed.</p>
+                        </div>
+                        <div id="adminDoctorFeedback" aria-live="polite"></div>
+                        <div id="adminDoctorsList" class="admin-doctor-list">
+                            <div class="admin-table-state">Loading doctors...</div>
+                        </div>
+                    </section>
 
                     <form id="adminAppointmentFilters" class="admin-filter-bar" novalidate>
                         <div>

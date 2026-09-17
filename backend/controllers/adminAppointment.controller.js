@@ -1,4 +1,5 @@
 import Appointment, { appointmentStatuses } from "../models/appointment.model.js";
+import Doctor from "../models/doctor.model.js";
 
 const pageSize = 20;
 const identifierPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -91,6 +92,24 @@ function normalizeAppointmentRef(value) {
   }
 
   return appointmentRef;
+}
+
+function normalizeDoctorIdentifier(value) {
+  const doctorIdentifier = asTrimmedString(value).toLowerCase();
+
+  if (!doctorIdentifier || doctorIdentifier.length > 80 || !identifierPattern.test(doctorIdentifier)) {
+    throw new ApiError(400, "Doctor identifier is invalid.");
+  }
+
+  return doctorIdentifier;
+}
+
+function normalizeAvailabilityInput(body) {
+  if (!body || typeof body.available !== "boolean") {
+    throw new ApiError(400, "Doctor availability must be true or false.");
+  }
+
+  return body.available;
 }
 
 export async function listAdminAppointments(req, res, next) {
@@ -198,6 +217,58 @@ export async function approveAdminAppointment(req, res, next) {
     return res.status(409).json({
       success: false,
       message: "Only future pending appointments can be approved."
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    next(error);
+  }
+}
+
+export async function setDoctorAvailability(req, res, next) {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    const doctorIdentifier = normalizeDoctorIdentifier(req.params.doctorIdentifier);
+    const available = normalizeAvailabilityInput(req.body || {});
+
+    const doctor = await Doctor.findOneAndUpdate(
+      { doctorIdentifier },
+      { $set: { available } },
+      {
+        returnDocument: "after",
+        runValidators: true
+      }
+    )
+      .select("doctorIdentifier name role room available serviceIdentifier service -_id")
+      .populate({ path: "service", select: "name serviceIdentifier -_id" })
+      .maxTimeMS(8000)
+      .lean();
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: "Doctor was not found."
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: available ? "Doctor is now available for new bookings." : "Doctor is now unavailable for new bookings.",
+      data: {
+        doctorIdentifier: doctor.doctorIdentifier,
+        name: doctor.name,
+        role: doctor.role,
+        room: doctor.room,
+        available: doctor.available,
+        serviceIdentifier: doctor.serviceIdentifier,
+        serviceName: doctor.service?.name || doctor.serviceIdentifier
+      }
     });
   } catch (error) {
     if (error instanceof ApiError) {
