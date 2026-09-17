@@ -38,7 +38,7 @@
         <section class="page-hero">
             <div class="container"><span class="section-kicker">Clinic admin</span>
                 <h1>Appointment List</h1>
-                <p>Review clinic appointments and approve future pending bookings. Other appointment-management tools are not included yet.</p>
+                <p>Review clinic appointments, approve future pending bookings, and mark confirmed visits completed after their scheduled time when the patient attended.</p>
             </div>
         </section>
         <section class="section-padding">
@@ -68,9 +68,10 @@
 
                     <form id="adminAppointmentFilters" class="admin-filter-bar" novalidate>
                         <div>
-                            <label for="adminDoctorFilter" class="form-label">Doctor Identifier</label>
-                            <input type="text" class="form-control" id="adminDoctorFilter"
-                                placeholder="Example: dr-amina-bello">
+                            <label for="adminDoctorFilter" class="form-label">Doctor</label>
+                            <select class="form-select" id="adminDoctorFilter">
+                                <option value="">All doctors</option>
+                            </select>
                         </div>
                         <div>
                             <label for="adminStatusFilter" class="form-label">Status</label>

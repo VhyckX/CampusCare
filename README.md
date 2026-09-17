@@ -333,11 +333,25 @@ Admin identity is always read from the server-side session. Future admin-only ro
 
 ### Admin Navigation and Doctor Availability
 
+The dashboard's doctor dropdown includes All doctors and every catalog doctor, including unavailable doctors. Applying filters sends the selected `doctorIdentifier` and resets pagination to page 1.
+
+`POST /api/admin/appointments/:appointmentRef/cancel` requires active-admin authentication and CSRF. Only future Pending/Confirmed appointments can be cancelled; already Cancelled returns success without another write. Unknown references return 404 and ineligible or concurrently changed records return 409. The conditional update matches the observed status, preserving concurrent approval/completion. Cancellation preserves the record and releases its active slot. Dashboard cancellation requires confirmation and refreshes the current filtered page after success; failures preserve displayed records. Guest cancellation is unchanged.
+
+Admins can use `POST /api/admin/appointments/:appointmentRef/complete` with their active session and CSRF token. Only Confirmed appointments at or before the server's current time can become Completed. The atomic conditional update preserves concurrent cancellation; already Completed records return success without another write. Unknown references return 404, and ineligible states return 409. The dashboard requires confirmation that the patient attended, updates only after API success, and refreshes the current filtered page. Appointments are never automatically completed.
+
 Public-page navigation includes a same-tab Admin Login link. A successful admin session check changes it to Dashboard; a missing session or failed check leaves Admin Login usable without blocking public pages.
 
 The dashboard lists doctors, services and current availability. Its controls use `POST /api/admin/doctors/:doctorIdentifier/availability` with a strict boolean `available` value, an authenticated admin session and a CSRF token. The displayed state changes only after saving succeeds. Availability affects new bookings only; existing appointments remain unchanged. Fresh public catalog requests reflect saved availability, and booking validation rejects unavailable doctors.
 
 The successful manual availability check was reported by the site owner. Focused mocked checks also passed for protected access, CSRF, input validation, updates and failed-save feedback; these checks were not repeated for this checkpoint.
+
+### Admin Management Verification
+
+Focused isolated JavaScript tests with mocked database/API responses passed for completion and admin cancellation permissions, CSRF, reference validation, allowed/rejected transitions, idempotent responses, concurrent status-change protection, failed-request feedback, expired sessions, stale responses and doctor-dropdown filtering. These checks did not write to a live database.
+
+Browser checks used headless Edge with mocked APIs and isolated browser storage at 390px and 768px. Navigation expansion, availability saving, doctor filtering (resetting to page 1), pagination and table-action readability passed. Light/dark screenshots were visually inspected; document widths stayed at 390px/768px while horizontal scrolling remained inside the appointment table. The dark-mode date-picker icon contrast fix was visually verified, and no application JavaScript errors were observed. Temporary test servers were stopped.
+
+Physical-phone testing has not been done. The earlier availability check is a site-owner-reported manual result, not an automated live-database check of this management batch. Completion/cancellation concurrency was tested with mocks, not real MongoDB concurrency. Previously passed tests were not repeated for this checkpoint.
 
 ### Latest Lookup Test Results
 
@@ -416,7 +430,7 @@ Only use this as a local troubleshooting setting. A DNS server address provided 
 - `backend/routes/catalog.routes.js` and `backend/controllers/catalog.controller.js` - Provide read-only services/doctors catalog APIs.
 - `backend/routes/appointment.routes.js` and `backend/controllers/appointment.controller.js` - Create bookings, look up appointment status, and cancel eligible guest appointments through the backend API.
 - `backend/routes/adminAuth.routes.js` and `backend/controllers/adminAuth.controller.js` - Provide admin login, logout, current-admin, and CSRF-token endpoints.
-- `backend/routes/admin.routes.js` and `backend/controllers/adminAppointment.controller.js` - Provide the protected clinic-admin appointment list, approval and doctor availability endpoints.
+- `backend/routes/admin.routes.js` and `backend/controllers/adminAppointment.controller.js` - Provide the protected clinic-admin appointment list, approval, completion, cancellation and doctor availability endpoints.
 - `backend/routes/health.routes.js` - Defines the `/api/health` route.
 - `backend/controllers/health.controller.js` - Sends the health-check JSON response.
 - `backend/.env.example` - Shows the required environment variable format.
@@ -431,4 +445,4 @@ CampusCare appointment forms use the Nigerian clinic's local calendar date and t
 
 Appointment status is stored separately and must not be changed automatically just because `scheduledAt` is in the past.
 
-No public doctor registration, student authentication, frontend framework, broad staff dashboard, or external PDF conversion service is included yet. The current clinic-admin dashboard supports protected appointment viewing, filtering, pagination, approval of eligible future pending appointments, and doctor availability controls for new bookings.
+No public doctor registration, student authentication, frontend framework, broad staff dashboard, or external PDF conversion service is included yet. The current clinic-admin dashboard supports protected appointment viewing, doctor-name/status/date filtering, pagination, approval, explicit completion after attendance, eligible future-booking cancellation, and doctor availability controls for new bookings.

@@ -565,6 +565,10 @@ a:hover {
     overflow-x: auto
 }
 
+body.dark-mode #adminDateFilter {
+    color-scheme: dark
+}
+
 .admin-appointments-table {
     min-width: 840px
 }

@@ -1708,6 +1708,24 @@ function replaceAdminDoctorRow(doctor) {
   });
 }
 
+function populateAdminDoctorFilter(doctors) {
+  const select = document.getElementById("adminDoctorFilter");
+  if (!select) return;
+  const previousValue = select.value;
+  select.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "All doctors";
+  select.appendChild(all);
+  doctors.forEach(function (doctor) {
+    const option = document.createElement("option");
+    option.value = doctor.doctorIdentifier;
+    option.textContent = doctor.name || doctor.doctorIdentifier;
+    select.appendChild(option);
+  });
+  select.value = doctors.some(function (doctor) { return doctor.doctorIdentifier === previousValue; }) ? previousValue : "";
+}
+
 async function loadAdminDoctors() {
   const dashboardPage = document.getElementById("adminDashboardPage");
   if (!dashboardPage) return;
@@ -1717,6 +1735,7 @@ async function loadAdminDoctors() {
 
   try {
     const payload = await fetchApi("/doctors");
+    populateAdminDoctorFilter(payload.data || []);
     renderAdminDoctors(payload.data || []);
   } catch (error) {
     setAdminDoctorsLoading("Unable to load doctors.");
@@ -1784,7 +1803,19 @@ function isFuturePendingAdminAppointment(appointment) {
     return false;
   }
 
-  const scheduledAt = new Date(appointment.appointmentDate + "T" + appointment.appointmentTime + ":00");
+  const scheduledAt = new Date(appointment.appointmentDate + "T" + appointment.appointmentTime + ":00+01:00");
+  return !Number.isNaN(scheduledAt.getTime()) && scheduledAt.getTime() > Date.now();
+}
+
+function isCompletableAdminAppointment(appointment) {
+  if (!appointment || appointment.status !== "Confirmed" || !appointment.appointmentDate || !appointment.appointmentTime) return false;
+  const scheduledAt = new Date(appointment.appointmentDate + "T" + appointment.appointmentTime + ":00+01:00");
+  return !Number.isNaN(scheduledAt.getTime()) && scheduledAt.getTime() <= Date.now();
+}
+
+function isCancellableAdminAppointment(appointment) {
+  if (!appointment || !["Pending", "Confirmed"].includes(appointment.status)) return false;
+  const scheduledAt = new Date(appointment.appointmentDate + "T" + appointment.appointmentTime + ":00+01:00");
   return !Number.isNaN(scheduledAt.getTime()) && scheduledAt.getTime() > Date.now();
 }
 
@@ -1821,9 +1852,24 @@ function renderAdminAppointmentRow(appointment) {
     approveButton.textContent = "Approve";
     approveButton.setAttribute("data-admin-approve-ref", appointment.appointmentRef);
     actionCell.appendChild(approveButton);
-  } else {
+  } else if (isCompletableAdminAppointment(appointment)) {
+    const completeButton = document.createElement("button");
+    completeButton.type = "button";
+    completeButton.className = "btn btn-primary btn-sm";
+    completeButton.textContent = "Mark Completed";
+    completeButton.setAttribute("data-admin-complete-ref", appointment.appointmentRef);
+    actionCell.appendChild(completeButton);
+  } else if (!isCancellableAdminAppointment(appointment)) {
     actionCell.textContent = "Not available";
     actionCell.className = "text-muted";
+  }
+  if (isCancellableAdminAppointment(appointment)) {
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "btn btn-outline-danger btn-sm ms-2";
+    cancelButton.textContent = "Cancel";
+    cancelButton.setAttribute("data-admin-cancel-ref", appointment.appointmentRef);
+    actionCell.appendChild(cancelButton);
   }
   row.appendChild(actionCell);
 
@@ -1938,6 +1984,84 @@ async function approveAdminAppointment(appointmentRef, button) {
   }
 }
 
+async function cancelAdminAppointment(appointmentRef, button) {
+  const filterKey = getAdminDashboardFilterKey();
+  const listSequence = adminAppointmentsRequestSequence;
+  const originalText = button.textContent;
+  const isCurrent = function () {
+    return listSequence === adminAppointmentsRequestSequence && filterKey === getAdminDashboardFilterKey();
+  };
+  button.disabled = true;
+  button.textContent = "Cancelling...";
+  setAdminDashboardFeedback("", "");
+  try {
+    const csrfToken = await getAdminCsrfToken();
+    const payload = await fetchAdminApi("/admin/appointments/" + encodeURIComponent(appointmentRef) + "/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+      body: JSON.stringify({})
+    });
+    if (!isCurrent()) return;
+    const refresh = loadAdminAppointments(adminAppointmentsPage);
+    const refreshSequence = adminAppointmentsRequestSequence;
+    await refresh;
+    if (refreshSequence === adminAppointmentsRequestSequence && filterKey === getAdminDashboardFilterKey()) {
+      setAdminDashboardFeedback("success", payload.message || "Appointment cancelled successfully.");
+    }
+  } catch (error) {
+    if (!isCurrent()) return;
+    if (error.status === 401) {
+      setAdminDashboardFeedback("warning", "Your admin session has expired. Redirecting to login...");
+      window.setTimeout(function () { window.location.href = "admin-login.html"; }, 800);
+      return;
+    }
+    setAdminDashboardFeedback(error.status === 409 ? "warning" : "danger", error.message || "Unable to cancel this appointment.");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+async function completeAdminAppointment(appointmentRef, button) {
+  const filterKey = getAdminDashboardFilterKey();
+  const listSequence = adminAppointmentsRequestSequence;
+  const originalText = button.textContent;
+  const isCurrent = function () {
+    return listSequence === adminAppointmentsRequestSequence && filterKey === getAdminDashboardFilterKey();
+  };
+
+  button.disabled = true;
+  button.textContent = "Completing...";
+  setAdminDashboardFeedback("", "");
+
+  try {
+    const csrfToken = await getAdminCsrfToken();
+    const payload = await fetchAdminApi("/admin/appointments/" + encodeURIComponent(appointmentRef) + "/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+      body: JSON.stringify({})
+    });
+    if (!isCurrent()) return;
+    const refresh = loadAdminAppointments(adminAppointmentsPage);
+    const refreshSequence = adminAppointmentsRequestSequence;
+    await refresh;
+    if (refreshSequence === adminAppointmentsRequestSequence && filterKey === getAdminDashboardFilterKey()) {
+      setAdminDashboardFeedback("success", payload.message || "Appointment marked completed.");
+    }
+  } catch (error) {
+    if (!isCurrent()) return;
+    if (error.status === 401) {
+      setAdminDashboardFeedback("warning", "Your admin session has expired. Redirecting to login...");
+      window.setTimeout(function () { window.location.href = "admin-login.html"; }, 800);
+      return;
+    }
+    setAdminDashboardFeedback(error.status === 409 ? "warning" : "danger", error.message || "Unable to complete this appointment.");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
 function setupAdminDashboardFilters() {
   const form = document.getElementById("adminAppointmentFilters");
   const clearButton = document.getElementById("adminClearFilters");
@@ -1973,6 +2097,18 @@ function setupAdminDashboardFilters() {
   const tableBody = document.getElementById("adminAppointmentsBody");
   if (tableBody) {
     tableBody.addEventListener("click", function (event) {
+      const cancelButton = event.target.closest("[data-admin-cancel-ref]");
+      if (cancelButton) {
+        if (cancelButton.disabled || !window.confirm("Cancel this appointment? The booking will be preserved and its slot released.")) return;
+        cancelAdminAppointment(cancelButton.getAttribute("data-admin-cancel-ref"), cancelButton);
+        return;
+      }
+      const completeButton = event.target.closest("[data-admin-complete-ref]");
+      if (completeButton) {
+        if (completeButton.disabled || !window.confirm("Confirm that the patient actually attended this appointment. Mark it completed?")) return;
+        completeAdminAppointment(completeButton.getAttribute("data-admin-complete-ref"), completeButton);
+        return;
+      }
       const button = event.target.closest("[data-admin-approve-ref]");
       if (!button || button.disabled) return;
 

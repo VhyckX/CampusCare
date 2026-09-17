@@ -230,6 +230,78 @@ export async function approveAdminAppointment(req, res, next) {
   }
 }
 
+export async function cancelAdminAppointment(req, res, next) {
+  res.set("Cache-Control", "no-store");
+  try {
+    const appointmentRef = normalizeAppointmentRef(req.params.appointmentRef);
+    const existing = await Appointment.findOne({ appointmentRef })
+      .select("appointmentRef status scheduledAt -_id").maxTimeMS(8000).lean();
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Appointment was not found." });
+    }
+    if (existing.status === "Cancelled") {
+      return res.status(200).json({ success: true, message: "Appointment is already cancelled.", data: { appointmentRef, status: "Cancelled" } });
+    }
+    const now = new Date();
+    if (!["Pending", "Confirmed"].includes(existing.status) || !(existing.scheduledAt > now)) {
+      return res.status(409).json({ success: false, message: "Only future pending or confirmed appointments can be cancelled." });
+    }
+    // Match the observed status so approval or completion between read and update wins.
+    const cancelled = await Appointment.findOneAndUpdate(
+      { appointmentRef, status: existing.status, scheduledAt: { $gt: new Date() } },
+      { $set: { status: "Cancelled" } },
+      { returnDocument: "after", runValidators: true }
+    ).select("appointmentRef status -_id").maxTimeMS(8000).lean();
+    if (!cancelled) {
+      return res.status(409).json({ success: false, message: "Appointment changed or is no longer eligible. Refresh the list before trying again." });
+    }
+    return res.status(200).json({ success: true, message: "Appointment cancelled successfully.", data: { appointmentRef: cancelled.appointmentRef, status: cancelled.status } });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+}
+
+export async function completeAdminAppointment(req, res, next) {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    const appointmentRef = normalizeAppointmentRef(req.params.appointmentRef);
+    const completed = await Appointment.findOneAndUpdate(
+      { appointmentRef, status: "Confirmed", scheduledAt: { $lte: new Date() } },
+      { $set: { status: "Completed" } },
+      { returnDocument: "after", runValidators: true }
+    ).select("appointmentRef status -_id").maxTimeMS(8000).lean();
+
+    const appointment = completed || await Appointment.findOne({ appointmentRef })
+      .select("appointmentRef status -_id").maxTimeMS(8000).lean();
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: "Appointment was not found." });
+    }
+
+    if (appointment.status !== "Completed") {
+      return res.status(409).json({
+        success: false,
+        message: "Only confirmed appointments whose scheduled time has arrived can be marked completed."
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: completed ? "Appointment marked completed." : "Appointment is already completed.",
+      data: { appointmentRef: appointment.appointmentRef, status: appointment.status }
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+}
+
 export async function setDoctorAvailability(req, res, next) {
   res.set("Cache-Control", "no-store");
 
